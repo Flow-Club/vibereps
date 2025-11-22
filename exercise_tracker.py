@@ -12,12 +12,16 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import os
 from pathlib import Path
+import subprocess
+
 
 class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     """Custom HTTP handler to serve the exercise UI and handle completion"""
 
     exercise_complete = False
     completion_data = {}
+    claude_complete = False
+    quick_mode = False
 
     def do_GET(self):
         """Serve the exercise tracker HTML"""
@@ -28,6 +32,16 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 
             html_content = self.get_exercise_interface()
             self.wfile.write(html_content.encode())
+        elif self.path == '/status':
+            # Check if Claude is done
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            status = {
+                "claude_complete": ExerciseHTTPHandler.claude_complete,
+                "exercise_complete": ExerciseHTTPHandler.exercise_complete
+            }
+            self.wfile.write(json.dumps(status).encode())
         else:
             self.send_error(404)
 
@@ -46,6 +60,17 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "success"}).encode())
+            except Exception as e:
+                self.send_error(500, str(e))
+        elif self.path == '/notify':
+            # Notification from Claude that it's done
+            try:
+                ExerciseHTTPHandler.claude_complete = True
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "notified"}).encode())
             except Exception as e:
                 self.send_error(500, str(e))
         else:
@@ -165,13 +190,13 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 </head>
 <body>
     <div class="container">
-        <h1>🏋️ Claude Code Exercise Break!</h1>
+        <h1>🏋️ Vibe Reps</h1>
         <p style="text-align: center;">Time to move! Select an exercise and get your reps in:</p>
 
-        <div class="exercise-selector">
-            <button onclick="startExercise('squats')" id="squatsBtn">Squats (10)</button>
-            <button onclick="startExercise('pushups')" id="pushupsBtn">Push-ups (10)</button>
-            <button onclick="startExercise('jumping_jacks')" id="jjBtn">Jumping Jacks (20)</button>
+        <div class="exercise-selector" id="exerciseSelector">
+            <button onclick="startExercise('squats')" id="squatsBtn">Squats (<span class="rep-count">10</span>)</button>
+            <button onclick="startExercise('pushups')" id="pushupsBtn">Push-ups (<span class="rep-count">10</span>)</button>
+            <button onclick="startExercise('jumping_jacks')" id="jjBtn">Jumping Jacks (<span class="rep-count">20</span>)</button>
         </div>
 
         <div id="videoContainer">
@@ -189,10 +214,23 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
         let currentExercise = null;
         let repCount = 0;
         let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20};
+        let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10};
         let exerciseState = null;
         let pose = null;
         let camera = null;
         let startTime = null;
+        let statusPollInterval = null;
+        let isQuickMode = new URLSearchParams(window.location.search).get('quick') === 'true';
+
+        // Set up quick mode if enabled
+        if (isQuickMode) {
+            targetReps = quickModeReps;
+            document.querySelector('#squatsBtn .rep-count').textContent = quickModeReps.squats;
+            document.querySelector('#pushupsBtn .rep-count').textContent = quickModeReps.pushups;
+            document.querySelector('#jjBtn .rep-count').textContent = quickModeReps.jumping_jacks;
+            document.querySelector('h1').innerHTML = '⚡ Quick Exercise Break!';
+            document.querySelector('p').textContent = 'Quick session while Claude works!';
+        }
 
         // Initialize MediaPipe Pose
         async function initPose() {
@@ -411,30 +449,92 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             if (repCount >= targetReps[currentExercise]) {
                 document.getElementById('status').textContent = '🎉 Great job! Exercise complete!';
 
-                // Re-enable buttons for next exercise
-                setTimeout(() => {
-                    document.querySelectorAll('.exercise-selector button').forEach(btn => {
-                        btn.disabled = false;
-                        btn.classList.remove('active');
-                    });
+                // Stop camera
+                if (camera) {
+                    camera.stop();
+                }
+                const video = document.getElementById('video');
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                document.getElementById('videoContainer').classList.remove('active');
 
-                    // Stop camera
-                    if (camera) {
-                        camera.stop();
-                    }
-                    const video = document.getElementById('video');
-                    if (video.srcObject) {
-                        video.srcObject.getTracks().forEach(track => track.stop());
-                    }
-                    document.getElementById('videoContainer').classList.remove('active');
+                if (isQuickMode) {
+                    // In quick mode, wait and then show "Claude is working" status
+                    setTimeout(() => {
+                        document.getElementById('status').textContent = '⏳ Claude is working on your request...';
+                        document.getElementById('exerciseSelector').style.display = 'none';
+                        document.querySelector('.finish-btn').textContent = 'Waiting for Claude...';
+                        document.querySelector('.finish-btn').disabled = true;
 
-                    exerciseState = null;
-                    document.getElementById('status').textContent = 'Great work! Pick another exercise or finish session.';
-                }, 2000);
+                        // Start polling for Claude completion
+                        startStatusPolling();
+                    }, 2000);
+                } else {
+                    // Normal mode - re-enable buttons for next exercise
+                    setTimeout(() => {
+                        document.querySelectorAll('.exercise-selector button').forEach(btn => {
+                            btn.disabled = false;
+                            btn.classList.remove('active');
+                        });
+
+                        exerciseState = null;
+                        document.getElementById('status').textContent = 'Great work! Pick another exercise or finish session.';
+                    }, 2000);
+                }
             } else {
                 const remaining = targetReps[currentExercise] - repCount;
                 document.getElementById('status').textContent = `Keep going! ${remaining} more! 💪`;
             }
+        }
+
+        function startStatusPolling() {
+            if (statusPollInterval) return; // Already polling
+
+            statusPollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/status');
+                    const status = await response.json();
+
+                    if (status.claude_complete) {
+                        clearInterval(statusPollInterval);
+                        showClaudeCompleteNotification();
+                    }
+                } catch (error) {
+                    console.error('Status poll error:', error);
+                }
+            }, 1000); // Poll every second
+        }
+
+        function showClaudeCompleteNotification() {
+            document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
+            document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
+            document.querySelector('.finish-btn').disabled = false;
+            document.querySelector('.finish-btn').onclick = () => window.close();
+
+            // Desktop notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Claude Code Ready!', {
+                    body: 'Your request is complete. Check Claude Code!',
+                    icon: '🤖'
+                });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Claude Code Ready!', {
+                            body: 'Your request is complete. Check Claude Code!',
+                            icon: '🤖'
+                        });
+                    }
+                });
+            }
+
+            // Play sound alert (optional)
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiDYIGGS46ummTgwNUKzn8LdmHAU9kdz0y3krBSp+zPLaizsKE1+36eyrWRIJSKHh87ljHgU2fcrx24k4ChdbsuXqpVELDFCt5++8aB8GOpHb9Ml5KwUlfcry2I89ChNguuvrs1kSCUuf4PPAaCAGN4HL8tyJNwoZZbjo6qZPDA5RruXwvGgfBTyS2/fLeSsGKX/L8tqLOwoSX7Tl6qxZEwlHoOHz'
+                );
+                audio.play().catch(() => {}); // Ignore errors
+            } catch (e) {}
         }
 
         function finishSession() {
@@ -468,17 +568,20 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 </html>
         '''
 
+
 class ExerciseTrackerHook:
     def __init__(self):
         self.port = 8765
         self.server = None
         self.server_thread = None
 
-    def start_web_server(self):
+    def start_web_server(self, quick_mode=False):
         """Start a local web server to handle webcam UI"""
         # Reset completion state
         ExerciseHTTPHandler.exercise_complete = False
         ExerciseHTTPHandler.completion_data = {}
+        ExerciseHTTPHandler.claude_complete = False
+        ExerciseHTTPHandler.quick_mode = quick_mode
 
         # Start server
         self.server = HTTPServer(('localhost', self.port), ExerciseHTTPHandler)
@@ -486,7 +589,10 @@ class ExerciseTrackerHook:
         self.server_thread.daemon = True
         self.server_thread.start()
 
-        return f"http://localhost:{self.port}"
+        url = f"http://localhost:{self.port}"
+        if quick_mode:
+            url += "?quick=true"
+        return url
 
     def wait_for_completion(self, timeout=600):
         """Wait for exercise session to complete"""
@@ -499,11 +605,59 @@ class ExerciseTrackerHook:
 
         return None
 
+    def run_server_daemon(self, quick_mode=True):
+        """Run the server in daemon mode (blocking)"""
+        url = self.start_web_server(quick_mode=quick_mode)
+
+        # Open browser
+        print(f"⚡ Quick exercise session! Opening {url}")
+        webbrowser.open(url)
+
+        # Keep server running until user closes browser or timeout
+        print("🏋️ Server running... Close browser window to exit.")
+
+        # Wait for either completion or timeout (10 minutes max)
+        start_time = time.time()
+        while time.time() - start_time < 600:
+            if ExerciseHTTPHandler.exercise_complete:
+                print("✅ Session complete!")
+                break
+            time.sleep(1)
+
+        # Shutdown server
+        if self.server:
+            self.server.shutdown()
+
     def handle_hook(self, event_type, data):
         """Main hook handler"""
-        if event_type == "task_complete":
-            # Start the web server
-            url = self.start_web_server()
+        if event_type == "user_prompt_submit" or event_type == "post_tool_use":
+            # Launch as detached background process
+            script_path = os.path.abspath(__file__)
+
+            # Check if server is already running
+            try:
+                import urllib.request
+                urllib.request.urlopen("http://localhost:8765/status", timeout=1)
+                # Server already running, skip
+                return {"status": "skipped", "message": "Exercise tracker already running"}
+            except:
+                # Server not running, launch it
+                pass
+
+            # Launch detached background process
+            subprocess.Popen(
+                [sys.executable, script_path, "--daemon"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Detach from parent
+            )
+
+            return {"status": "success", "message": "Exercise tracker launched in background"}
+
+        elif event_type == "task_complete":
+            # Normal mode - wait for user to complete exercises
+            url = self.start_web_server(quick_mode=False)
 
             # Open browser
             print(f"🏋️ Exercise break triggered! Opening {url}")
@@ -513,7 +667,8 @@ class ExerciseTrackerHook:
             result = self.wait_for_completion(timeout=300)  # 5 minutes max
 
             if result:
-                print(f"✅ Exercise complete! {result.get('reps', 0)} reps of {result.get('exercise', 'unknown')}")
+                print(
+                    f"✅ Exercise complete! {result.get('reps', 0)} reps of {result.get('exercise', 'unknown')}")
             else:
                 print("⏱️ Session timeout or window closed")
 
@@ -525,14 +680,22 @@ class ExerciseTrackerHook:
 
         return {"status": "skipped", "message": f"Event type {event_type} not handled"}
 
+
 def main():
+    # Check if running as daemon
+    if len(sys.argv) > 1 and sys.argv[1] == "--daemon":
+        # Run server in daemon mode
+        tracker = ExerciseTrackerHook()
+        tracker.run_server_daemon(quick_mode=True)
+        return 0
+
     # Parse Claude Code hook event
     if len(sys.argv) > 1:
         event_type = sys.argv[1]
         data = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
     else:
         # Test mode
-        event_type = "task_complete"
+        event_type = "post_tool_use"
         data = {}
 
     # Initialize and run tracker
@@ -541,6 +704,7 @@ def main():
 
     print(json.dumps(result))
     return 0 if result["status"] == "success" else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/flowclub/code/vibereps/exercise_tracker.py",
+            "args": ["post_tool_use", "{}"]
+          }
+        ]
+      }
+    ],
+    "PostMessage": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/flowclub/code/vibereps/notify_complete.py",
+            "args": ["{}"]
+          }
+        ]
+      }
+    ]
+  }
+}
