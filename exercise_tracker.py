@@ -25,14 +25,18 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Serve the exercise tracker HTML"""
-        if self.path == '/' or self.path == '/index.html':
+        # Parse path without query parameters
+        from urllib.parse import urlparse
+        parsed_path = urlparse(self.path).path
+
+        if parsed_path == '/' or parsed_path == '/index.html':
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
 
             html_content = self.get_exercise_interface()
             self.wfile.write(html_content.encode())
-        elif self.path == '/status':
+        elif parsed_path == '/status':
             # Check if Claude is done
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -190,8 +194,8 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 </head>
 <body>
     <div class="container">
-        <h1>🏋️ Vibe Reps</h1>
-        <p style="text-align: center;">Time to move! Select an exercise and get your reps in:</p>
+        <h1>Vibe Reps</h1>
+        <p style="text-align: center;">Time to move! Get your reps in:</p>
 
         <div class="exercise-selector" id="exerciseSelector">
             <button onclick="startExercise('squats')" id="squatsBtn">Squats (<span class="rep-count">10</span>)</button>
@@ -609,12 +613,8 @@ class ExerciseTrackerHook:
         """Run the server in daemon mode (blocking)"""
         url = self.start_web_server(quick_mode=quick_mode)
 
-        # Open browser
-        print(f"⚡ Quick exercise session! Opening {url}")
-        webbrowser.open(url)
-
+        # Browser is opened by parent process, not here
         # Keep server running until user closes browser or timeout
-        print("🏋️ Server running... Close browser window to exit.")
 
         # Wait for either completion or timeout (10 minutes max)
         start_time = time.time()
@@ -640,7 +640,7 @@ class ExerciseTrackerHook:
                 urllib.request.urlopen("http://localhost:8765/status", timeout=1)
                 # Server already running, skip
                 return {"status": "skipped", "message": "Exercise tracker already running"}
-            except:
+            except BaseException:
                 # Server not running, launch it
                 pass
 
@@ -652,6 +652,11 @@ class ExerciseTrackerHook:
                 stdin=subprocess.DEVNULL,
                 start_new_session=True  # Detach from parent
             )
+
+            # Give server a moment to start, then open browser from this process
+            time.sleep(0.5)
+            url = f"http://localhost:{self.port}?quick=true"
+            webbrowser.open(url)
 
             return {"status": "success", "message": "Exercise tracker launched in background"}
 

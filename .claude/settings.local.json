@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')"
     ],
     "deny": [],
     "ask": []
