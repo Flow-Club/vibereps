@@ -4,7 +4,8 @@
       "Bash(chmod:*)",
       "Bash(pkill:*)",
       "Bash(lsof:*)",
-      "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')"
+      "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
