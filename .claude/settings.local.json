@@ -5,7 +5,10 @@
       "Bash(pkill:*)",
       "Bash(lsof:*)",
       "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

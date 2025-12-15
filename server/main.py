@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models import init_db, User, Exercise
+from models import init_db, User, Exercise, DailySummaryRecord
 
 
 # Database setup
@@ -70,6 +70,15 @@ class StatsResponse(BaseModel):
     reps_today: int
     sessions_today: int
     favorite_exercise: Optional[str]
+
+
+class DailySummary(BaseModel):
+    """Daily summary combining code metrics and exercises."""
+    date: Optional[str] = None  # YYYY-MM-DD, defaults to today
+    lines_accepted: int = 0
+    pull_requests: int = 0
+    commits: int = 0
+    tokens_used: int = 0
 
 
 # FastAPI app
@@ -150,6 +159,94 @@ def get_leaderboard(db: Session = Depends(get_db)):
         {"rank": i + 1, "username": r.username, "total_reps": r.total_reps, "sessions": r.sessions}
         for i, r in enumerate(results)
     ]
+
+
+@app.post("/api/summary")
+def log_daily_summary(
+    summary: DailySummary,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Log daily code metrics summary. Updates if exists for that date."""
+    date = summary.date or datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Check if record exists for this date
+    existing = (
+        db.query(DailySummaryRecord)
+        .filter(DailySummaryRecord.user_id == user.id)
+        .filter(DailySummaryRecord.date == date)
+        .first()
+    )
+
+    if existing:
+        # Update existing record (accumulate)
+        existing.lines_accepted += summary.lines_accepted
+        existing.pull_requests += summary.pull_requests
+        existing.commits += summary.commits
+        existing.tokens_used += summary.tokens_used
+    else:
+        # Create new record
+        existing = DailySummaryRecord(
+            user_id=user.id,
+            date=date,
+            lines_accepted=summary.lines_accepted,
+            pull_requests=summary.pull_requests,
+            commits=summary.commits,
+            tokens_used=summary.tokens_used
+        )
+        db.add(existing)
+
+    db.commit()
+
+    return {
+        "status": "logged",
+        "date": date,
+        "lines_accepted": existing.lines_accepted,
+        "pull_requests": existing.pull_requests,
+        "commits": existing.commits,
+        "tokens_used": existing.tokens_used
+    }
+
+
+@app.get("/api/summary/{date}")
+def get_daily_summary(
+    date: str,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Get combined daily summary (code + exercises) for a specific date."""
+    # Get code metrics
+    code_summary = (
+        db.query(DailySummaryRecord)
+        .filter(DailySummaryRecord.user_id == user.id)
+        .filter(DailySummaryRecord.date == date)
+        .first()
+    )
+
+    # Get exercises for that date
+    exercises = (
+        db.query(Exercise)
+        .filter(Exercise.user_id == user.id)
+        .filter(func.date(Exercise.created_at) == date)
+        .all()
+    )
+
+    # Aggregate exercises by type
+    exercise_totals = {}
+    for e in exercises:
+        exercise_totals[e.exercise_type] = exercise_totals.get(e.exercise_type, 0) + e.reps
+
+    return {
+        "date": date,
+        "code": {
+            "lines_accepted": code_summary.lines_accepted if code_summary else 0,
+            "pull_requests": code_summary.pull_requests if code_summary else 0,
+            "commits": code_summary.commits if code_summary else 0,
+            "tokens_used": code_summary.tokens_used if code_summary else 0
+        },
+        "exercises": exercise_totals,
+        "total_reps": sum(exercise_totals.values())
+    }
 
 
 # ============== Helper functions ==============
@@ -259,6 +356,48 @@ MCP_TOOLS = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "log_daily_summary",
+        "description": "Log daily code metrics (lines accepted, PRs, commits, tokens)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lines_accepted": {
+                    "type": "integer",
+                    "description": "Lines of code accepted today"
+                },
+                "pull_requests": {
+                    "type": "integer",
+                    "description": "Pull requests created today"
+                },
+                "commits": {
+                    "type": "integer",
+                    "description": "Commits made today"
+                },
+                "tokens_used": {
+                    "type": "integer",
+                    "description": "Tokens used today"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Date in YYYY-MM-DD format (defaults to today)"
+                }
+            }
+        }
+    },
+    {
+        "name": "get_daily_summary",
+        "description": "Get combined daily summary of code metrics and exercises",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "description": "Date in YYYY-MM-DD format (defaults to today)"
+                }
+            }
+        }
     }
 ]
 
@@ -324,6 +463,75 @@ def handle_mcp_tool_call(tool_name: str, arguments: dict, user: User, db: Sessio
             "session_goal": user.daily_session_goal,
             "rep_progress": f"{reps_today}/{user.daily_rep_goal}",
             "session_progress": f"{sessions_today}/{user.daily_session_goal}"
+        }
+
+    elif tool_name == "log_daily_summary":
+        date = arguments.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+
+        existing = (
+            db.query(DailySummaryRecord)
+            .filter(DailySummaryRecord.user_id == user.id)
+            .filter(DailySummaryRecord.date == date)
+            .first()
+        )
+
+        if existing:
+            existing.lines_accepted += arguments.get("lines_accepted", 0)
+            existing.pull_requests += arguments.get("pull_requests", 0)
+            existing.commits += arguments.get("commits", 0)
+            existing.tokens_used += arguments.get("tokens_used", 0)
+        else:
+            existing = DailySummaryRecord(
+                user_id=user.id,
+                date=date,
+                lines_accepted=arguments.get("lines_accepted", 0),
+                pull_requests=arguments.get("pull_requests", 0),
+                commits=arguments.get("commits", 0),
+                tokens_used=arguments.get("tokens_used", 0)
+            )
+            db.add(existing)
+
+        db.commit()
+        return {
+            "status": "logged",
+            "date": date,
+            "lines_accepted": existing.lines_accepted,
+            "pull_requests": existing.pull_requests,
+            "commits": existing.commits,
+            "tokens_used": existing.tokens_used
+        }
+
+    elif tool_name == "get_daily_summary":
+        date = arguments.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+
+        code_summary = (
+            db.query(DailySummaryRecord)
+            .filter(DailySummaryRecord.user_id == user.id)
+            .filter(DailySummaryRecord.date == date)
+            .first()
+        )
+
+        exercises = (
+            db.query(Exercise)
+            .filter(Exercise.user_id == user.id)
+            .filter(func.date(Exercise.created_at) == date)
+            .all()
+        )
+
+        exercise_totals = {}
+        for e in exercises:
+            exercise_totals[e.exercise_type] = exercise_totals.get(e.exercise_type, 0) + e.reps
+
+        return {
+            "date": date,
+            "code": {
+                "lines_accepted": code_summary.lines_accepted if code_summary else 0,
+                "pull_requests": code_summary.pull_requests if code_summary else 0,
+                "commits": code_summary.commits if code_summary else 0,
+                "tokens_used": code_summary.tokens_used if code_summary else 0
+            },
+            "exercises": exercise_totals,
+            "total_reps": sum(exercise_totals.values())
         }
 
     else:
