@@ -224,6 +224,58 @@ Goals are stored per-user in the remote database. Default: 50 reps/day, 3 sessio
 - **Remote Server**: FastAPI, SQLAlchemy, uvicorn, mcp (see `server/requirements.txt`)
 - **Browser**: MediaPipe Pose and Camera Utils loaded from CDN (requires internet)
 
+## Local Monitoring Stack
+
+The `monitoring/` directory contains a Docker Compose stack for visualizing Claude Code usage metrics alongside exercise data.
+
+### Components
+
+- **OTEL Collector** - Receives OpenTelemetry metrics from Claude Code
+- **Prometheus** - Time-series database for metrics storage
+- **Pushgateway** - Accepts custom metrics from hooks (exercises, project tracking)
+- **Grafana** - Dashboard visualization (pre-configured dashboard included)
+
+### Setup
+
+```bash
+# Enable Claude Code telemetry (add to shell profile)
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+
+# Start monitoring stack
+cd monitoring
+docker-compose up -d
+
+# View Grafana dashboard
+open http://localhost:3000  # Default: admin/admin
+```
+
+### Available Metrics
+
+**From Claude Code (via OTEL):**
+- `claude_code_session_count` - CLI sessions started
+- `claude_code_token_usage_tokens_total` - Tokens by type (input/output/cache)
+- `claude_code_cost_usage_usd_total` - Cost by model
+- `claude_code_lines_of_code_count_total` - Lines added/removed
+- `claude_code_code_edit_tool_decision_total` - Edit accepts/rejects
+- `claude_code_active_time_total_seconds_total` - CLI active time
+
+**From Hooks (via Pushgateway):**
+- `exercise_reps_total` - Exercise reps by type
+- `exercise_sessions_total` - Exercise session count
+- `claude_project_session_total` - Sessions by project/branch
+
+### Reference
+
+For complete OTEL configuration options, see: https://code.claude.com/docs/en/monitoring-usage
+
+Key environment variables:
+- `CLAUDE_CODE_ENABLE_TELEMETRY=1` - Required to enable telemetry
+- `OTEL_METRIC_EXPORT_INTERVAL=10000` - Export interval in ms (default 60000)
+- `OTEL_RESOURCE_ATTRIBUTES` - Add custom labels (e.g., `team=platform`)
+
 ## Privacy & Security
 
 - All video processing happens client-side in browser (JavaScript)
@@ -231,4 +283,4 @@ Goals are stored per-user in the remote database. Default: 50 reps/day, 3 sessio
 - Local hook server only listens on localhost:8765
 - Remote server uses API key authentication
 - Exercise data (reps, timestamps) stored on remote server for stats/leaderboards
-- commit .claude/settings.local.json since it helps us use cluade code well
+- Telemetry is opt-in and never includes sensitive data (API keys, file contents)
