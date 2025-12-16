@@ -231,3 +231,4 @@ Goals are stored per-user in the remote database. Default: 50 reps/day, 3 sessio
 - Local hook server only listens on localhost:8765
 - Remote server uses API key authentication
 - Exercise data (reps, timestamps) stored on remote server for stats/leaderboards
+- commit .claude/settings.local.json since it helps us use cluade code well
