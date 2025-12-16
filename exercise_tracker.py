@@ -20,6 +20,7 @@ import urllib.error
 # Configuration - set these environment variables or edit directly
 VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
 VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
+PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")  # Prometheus Pushgateway
 
 
 def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
@@ -46,6 +47,54 @@ def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
 
     except (urllib.error.URLError, urllib.error.HTTPError) as e:
         print(f"Warning: Failed to log to remote server: {e}")
+        return False
+
+
+def log_to_prometheus(exercise: str, reps: int, duration: int = 0, mode: str = "normal") -> bool:
+    """Push exercise metrics to Prometheus Pushgateway."""
+    if not PUSHGATEWAY_URL:
+        return False
+
+    # Sanitize labels
+    exercise = "".join(c if c.isalnum() or c in "-_" else "_" for c in exercise)
+    mode = "".join(c if c.isalnum() or c in "-_" else "_" for c in mode)
+
+    from datetime import datetime
+    timestamp = datetime.now().timestamp()
+
+    metrics = f"""# HELP exercise_reps_total Total exercise reps completed
+# TYPE exercise_reps_total counter
+exercise_reps_total{{exercise="{exercise}",mode="{mode}"}} {reps}
+# HELP exercise_sessions_total Total exercise sessions completed
+# TYPE exercise_sessions_total counter
+exercise_sessions_total{{exercise="{exercise}",mode="{mode}"}} 1
+# HELP exercise_duration_seconds_total Total exercise duration in seconds
+# TYPE exercise_duration_seconds_total counter
+exercise_duration_seconds_total{{exercise="{exercise}",mode="{mode}"}} {duration}
+# HELP exercise_last_session_timestamp Timestamp of last exercise session
+# TYPE exercise_last_session_timestamp gauge
+exercise_last_session_timestamp{{exercise="{exercise}",mode="{mode}"}} {timestamp}
+# HELP exercise_last_session_reps Reps in most recent session
+# TYPE exercise_last_session_reps gauge
+exercise_last_session_reps{{exercise="{exercise}",mode="{mode}"}} {reps}
+"""
+
+    job_name = "exercise_tracker"
+    url = f"{PUSHGATEWAY_URL}/metrics/job/{job_name}/exercise/{exercise}/mode/{mode}"
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=metrics.encode("utf-8"),
+            method="POST"
+        )
+        req.add_header("Content-Type", "text/plain")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status == 200
+    except urllib.error.URLError:
+        # Pushgateway not available, silently ignore
+        return False
+    except Exception:
         return False
 
 
@@ -98,14 +147,18 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 exercise = data.get("exercise", "unknown")
                 reps = data.get("reps", 0)
                 duration = data.get("duration", 0)
+                mode = "quick" if ExerciseHTTPHandler.quick_mode else "normal"
+
                 remote_logged = log_to_remote(exercise, reps, duration)
+                prometheus_logged = log_to_prometheus(exercise, reps, duration, mode)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     "status": "success",
-                    "remote_logged": remote_logged
+                    "remote_logged": remote_logged,
+                    "prometheus_logged": prometheus_logged
                 }).encode())
             except Exception as e:
                 self.send_error(500, str(e))

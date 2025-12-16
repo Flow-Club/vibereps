@@ -14,7 +14,6 @@ exporters:
   # Export to Prometheus
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: claude_code
 
   # Debug output (optional)
   debug:

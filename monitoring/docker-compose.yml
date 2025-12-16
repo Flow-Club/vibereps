@@ -42,6 +42,14 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     restart: unless-stopped
 
+  # Pushgateway - for custom metrics from hooks
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+
 volumes:
   prometheus_data:
   grafana_data:
