@@ -12,11 +12,25 @@ Push shift-tab, push up, push code.
 
 **The workflow:** You submit prompt → Do 5 quick exercises → Claude notifies you when ready
 
-1. **Set up the hooks using Claude Code's `/hooks` command:**
+1. **Set up the hooks** by adding to `~/.claude/settings.json`:
 
-   ```
-   /hooks add UserPromptSubmit exercise_start /full/path/to/exercise_tracker.py user_prompt_submit {}
-   /hooks add PostMessage claude_ready /full/path/to/notify_complete.py {}
+   ```json
+   {
+     "hooks": {
+       "UserPromptSubmit": [
+         {
+           "type": "command",
+           "command": "/full/path/to/exercise_tracker.py user_prompt_submit '{}'"
+         }
+       ],
+       "PostMessage": [
+         {
+           "type": "command",
+           "command": "/full/path/to/notify_complete.py '{}'"
+         }
+       ]
+     }
+   }
    ```
 
    Replace `/full/path/to/` with your actual path (e.g., `/Users/flowclub/code/vibereps/`)
@@ -78,55 +92,34 @@ You return to check the response
 
 ## 🔧 Configuration
 
-### Manual Hook Setup (Alternative)
+### Environment Variables (Optional)
 
-If you prefer editing the config file directly, add to `~/.config/claude-code/hooks.json`:
+For remote logging and metrics, set these environment variables:
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/exercise_tracker.py",
-            "args": ["user_prompt_submit", "{}"]
-          }
-        ]
-      }
-    ],
-    "PostMessage": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/notify_complete.py",
-            "args": ["{}"]
-          }
-        ]
-      }
-    ]
-  }
-}
+```bash
+# Remote VibeReps server (optional)
+export VIBEREPS_API_URL=https://your-server.com
+export VIBEREPS_API_KEY=your_api_key
+
+# Local Prometheus Pushgateway (optional, for Grafana dashboard)
+export PUSHGATEWAY_URL=http://localhost:9091
 ```
-
-See `hooks.json.example` for a template.
 
 ### Customize Exercise Reps
 
-Edit `exercise_tracker.py` line ~214-215:
+Edit `exercise_ui.html` to change target reps:
 
 ```javascript
-let quickModeReps = {squats: 10, umping_jacks: 10};
+let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20};      // Normal mode
+let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10};     // Quick mode
 ```
 
 ### Change Detection Sensitivity
 
-Make squats require deeper depth in `exercise_tracker.py`:
+Adjust angle thresholds in `exercise_ui.html` (in the detection functions):
 
 ```javascript
-
+// Example: Make squats require deeper depth
 if (angle < 80 && exerciseState !== 'down') {  // Default: 100
 ```
 
@@ -176,9 +169,9 @@ which python3  # Use this path if needed
 
 ## 📚 More Info
 
-- `CLAUDE.md` - Technical architecture and development guide
-- `EXERCISE_TRACKER_SETUP.md` - Detailed setup instructions
-- `mcp_exercise_server.py` - MCP server for progress tracking (optional)
+- `CLAUDE.md` - Technical architecture, remote server setup, and monitoring stack
+- `exercise_ui.html` - UI and pose detection logic (customize reps and sensitivity here)
+- `server/` - Remote server for multi-user stats, leaderboards, and MCP integration
 
 ## 💡 Tips
 
