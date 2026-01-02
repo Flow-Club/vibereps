@@ -21,6 +21,7 @@ import urllib.error
 VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
 VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
 PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")  # Prometheus Pushgateway
+VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 
 
 def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
@@ -114,11 +115,11 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
 
         if parsed_path == '/' or parsed_path == '/index.html':
             self.send_response(200)
-            self.send_header('Content-type', 'text/html')
+            self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
 
             html_content = self.get_exercise_interface()
-            self.wfile.write(html_content.encode())
+            self.wfile.write(html_content.encode('utf-8'))
         elif parsed_path == '/status':
             # Check if Claude is done
             self.send_response(200)
@@ -272,6 +273,8 @@ class ExerciseTrackerHook:
             # Give server a moment to start, then open browser from this process
             time.sleep(0.5)
             url = f"http://localhost:{self.port}?quick=true"
+            if VIBEREPS_EXERCISES:
+                url += f"&exercises={VIBEREPS_EXERCISES}"
             webbrowser.open(url)
 
             return {"status": "success", "message": "Exercise tracker launched in background"}

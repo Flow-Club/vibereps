@@ -94,9 +94,11 @@ You return to check the response
 
 ### Environment Variables (Optional)
 
-For remote logging and metrics, set these environment variables:
-
 ```bash
+# Choose which exercises to use (comma-separated, random selection each time)
+export VIBEREPS_EXERCISES=squats,jumping_jacks   # Only squats and jumping jacks
+export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks  # All exercises
+
 # Remote VibeReps server (optional)
 export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key
@@ -104,6 +106,8 @@ export VIBEREPS_API_KEY=your_api_key
 # Local Prometheus Pushgateway (optional, for Grafana dashboard)
 export PUSHGATEWAY_URL=http://localhost:9091
 ```
+
+If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from the list and auto-start it (no manual selection needed).
 
 ### Customize Exercise Reps
 

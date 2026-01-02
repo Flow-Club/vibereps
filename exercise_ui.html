@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Claude Code Exercise Break</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
@@ -147,6 +148,28 @@
             document.querySelector('p').textContent = 'Quick session while Claude works!';
         }
 
+        // Auto-select random exercise if exercises parameter is provided
+        const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
+        if (exercisesParam) {
+            const enabledExercises = exercisesParam.split(',').map(e => e.trim()).filter(e =>
+                ['squats', 'pushups', 'jumping_jacks'].includes(e)
+            );
+            if (enabledExercises.length > 0) {
+                // Pick random exercise
+                const randomExercise = enabledExercises[Math.floor(Math.random() * enabledExercises.length)];
+                const exerciseNames = {squats: 'Squats', pushups: 'Push-ups', jumping_jacks: 'Jumping Jacks'};
+
+                // Hide the selector and show which exercise
+                document.getElementById('exerciseSelector').style.display = 'none';
+                document.querySelector('p').textContent = `Get ready for ${exerciseNames[randomExercise]}!`;
+
+                // Auto-start after page loads
+                window.addEventListener('load', () => {
+                    setTimeout(() => startExercise(randomExercise), 500);
+                });
+            }
+        }
+
         // Initialize MediaPipe Pose
         async function initPose() {
             if (typeof Pose === 'undefined') {
@@ -276,13 +299,25 @@
             const knee = landmarks[25];
             const ankle = landmarks[27];
 
+            // Thresholds (more lenient than before)
+            const DOWN_ANGLE = 120;  // Was 100 - now easier to trigger
+            const UP_ANGLE = 150;    // Was 160 - now easier to count rep
+
             if (hip && knee && ankle) {
                 const angle = calculateAngle(hip, knee, ankle);
 
-                if (angle < 100 && exerciseState !== 'down') {
+                // Show angle for debugging
+                const statusEl = document.getElementById('status');
+                if (exerciseState === 'ready' || exerciseState === 'up') {
+                    statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Squat down below ${DOWN_ANGLE}°`;
+                } else if (exerciseState === 'down') {
+                    statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Stand up above ${UP_ANGLE}°`;
+                }
+
+                if (angle < DOWN_ANGLE && exerciseState !== 'down') {
                     exerciseState = 'down';
-                    document.getElementById('status').textContent = 'Going down... ⬇️';
-                } else if (angle > 160 && exerciseState === 'down') {
+                    statusEl.textContent = `Good! Now stand up (${Math.round(angle)}°) ⬇️`;
+                } else if (angle > UP_ANGLE && exerciseState === 'down') {
                     exerciseState = 'up';
                     repCount++;
                     updateCounter();
