@@ -6,67 +6,155 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
     <style>
+        :root, [data-theme="vscode"] {
+            --bg: #1e1e1e;
+            --bg-light: #2d2d2d;
+            --border: #404040;
+            --text: #d4d4d4;
+            --text-dim: #808080;
+            --accent: #4ec9b0;
+            --success: #6a9955;
+            --warn: #dcdcaa;
+        }
+        [data-theme="dracula"] {
+            --bg: #282a36;
+            --bg-light: #343746;
+            --border: #44475a;
+            --text: #f8f8f2;
+            --text-dim: #6272a4;
+            --accent: #bd93f9;
+            --success: #50fa7b;
+            --warn: #f1fa8c;
+        }
+        [data-theme="nord"] {
+            --bg: #2e3440;
+            --bg-light: #3b4252;
+            --border: #4c566a;
+            --text: #eceff4;
+            --text-dim: #7b88a1;
+            --accent: #88c0d0;
+            --success: #a3be8c;
+            --warn: #ebcb8b;
+        }
+        [data-theme="solarized"] {
+            --bg: #002b36;
+            --bg-light: #073642;
+            --border: #586e75;
+            --text: #839496;
+            --text-dim: #657b83;
+            --accent: #2aa198;
+            --success: #859900;
+            --warn: #b58900;
+        }
+        [data-theme="monokai"] {
+            --bg: #272822;
+            --bg-light: #3e3d32;
+            --border: #49483e;
+            --text: #f8f8f2;
+            --text-dim: #75715e;
+            --accent: #a6e22e;
+            --success: #a6e22e;
+            --warn: #e6db74;
+        }
+        [data-theme="gruvbox"] {
+            --bg: #282828;
+            --bg-light: #3c3836;
+            --border: #504945;
+            --text: #ebdbb2;
+            --text-dim: #928374;
+            --accent: #fe8019;
+            --success: #b8bb26;
+            --warn: #fabd2f;
+        }
+        [data-theme="tokyo-night"] {
+            --bg: #1a1b26;
+            --bg-light: #24283b;
+            --border: #414868;
+            --text: #c0caf5;
+            --text-dim: #565f89;
+            --accent: #7aa2f7;
+            --success: #9ece6a;
+            --warn: #e0af68;
+        }
+        [data-theme="catppuccin"] {
+            --bg: #1e1e2e;
+            --bg-light: #313244;
+            --border: #45475a;
+            --text: #cdd6f4;
+            --text-dim: #7f849c;
+            --accent: #cba6f7;
+            --success: #a6e3a1;
+            --warn: #f9e2af;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Monaco, "Courier New", monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 8px;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             margin: 0;
             box-sizing: border-box;
+            font-size: 13px;
         }
         .container {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            padding: 12px;
             max-width: 100%;
             width: 100%;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             box-sizing: border-box;
         }
         h1 {
-            margin: 0 0 10px 0;
-            font-size: 1.4em;
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+            font-weight: normal;
+            color: var(--accent);
             text-align: center;
+        }
+        h1::before { content: "$ "; color: var(--text-dim); }
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            font-size: 0.9em;
         }
         .exercise-selector {
             display: flex;
-            gap: 10px;
-            margin: 20px 0;
+            gap: 6px;
+            margin: 12px 0;
             flex-wrap: wrap;
             justify-content: center;
         }
         button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.2);
-            color: white;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
             cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-            font-weight: 500;
+            font-size: 12px;
+            font-family: inherit;
+            transition: all 0.15s;
         }
         button:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
+            border-color: var(--accent);
+            color: var(--accent);
         }
         button.active {
-            background: rgba(255,255,255,0.4);
-            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
         }
         button:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
         #videoContainer {
             position: relative;
-            margin: 10px 0;
-            border-radius: 8px;
+            margin: 8px 0;
+            border: 1px solid var(--border);
             overflow: hidden;
             display: none;
         }
@@ -77,8 +165,8 @@
             width: 100%;
             max-width: 100%;
             height: auto;
-            border-radius: 8px;
             display: block;
+            filter: grayscale(30%) contrast(1.1);
         }
         canvas {
             position: absolute;
@@ -88,31 +176,83 @@
             height: 100%;
         }
         .counter {
-            font-size: 2.5em;
+            font-size: 2.2em;
             font-weight: bold;
-            margin: 10px 0;
+            margin: 8px 0;
             text-align: center;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
         }
+        .counter::before { content: "["; color: var(--text-dim); }
+        .counter::after { content: "]"; color: var(--text-dim); }
         .status {
             text-align: center;
-            font-size: 0.95em;
+            font-size: 0.9em;
             margin: 8px 0;
-            line-height: 1.3;
+            line-height: 1.4;
+            color: var(--warn);
+            min-height: 2.8em;
         }
         .finish-btn {
-            background: rgba(76, 175, 80, 0.3);
-            margin-top: 10px;
+            background: var(--bg);
+            border-color: var(--success);
+            color: var(--success);
+            margin-top: 8px;
             width: 100%;
         }
         .finish-btn:hover {
-            background: rgba(76, 175, 80, 0.5);
+            background: var(--success);
+            color: var(--bg);
         }
+        .rep-count {
+            color: var(--accent);
+        }
+        .theme-bar {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .theme-btn {
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .theme-btn:hover {
+            transform: scale(1.2);
+            border-color: var(--text);
+        }
+        .theme-btn.active {
+            border: 2px solid var(--text);
+        }
+        .theme-btn[data-t="vscode"] { background: #4ec9b0; }
+        .theme-btn[data-t="dracula"] { background: #bd93f9; }
+        .theme-btn[data-t="nord"] { background: #88c0d0; }
+        .theme-btn[data-t="solarized"] { background: #2aa198; }
+        .theme-btn[data-t="monokai"] { background: #a6e22e; }
+        .theme-btn[data-t="gruvbox"] { background: #fe8019; }
+        .theme-btn[data-t="tokyo-night"] { background: #7aa2f7; }
+        .theme-btn[data-t="catppuccin"] { background: #cba6f7; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Vibe Reps</h1>
-        <p style="text-align: center;">Time to move! Get your reps in:</p>
+        <div class="theme-bar">
+            <button class="theme-btn" data-t="vscode" title="VS Code"></button>
+            <button class="theme-btn" data-t="dracula" title="Dracula"></button>
+            <button class="theme-btn" data-t="nord" title="Nord"></button>
+            <button class="theme-btn" data-t="solarized" title="Solarized"></button>
+            <button class="theme-btn" data-t="monokai" title="Monokai"></button>
+            <button class="theme-btn" data-t="gruvbox" title="Gruvbox"></button>
+            <button class="theme-btn" data-t="tokyo-night" title="Tokyo Night"></button>
+            <button class="theme-btn" data-t="catppuccin" title="Catppuccin"></button>
+        </div>
+        <h1>vibereps</h1>
+        <p class="subtitle">time to move</p>
 
         <div class="exercise-selector" id="exerciseSelector">
             <button onclick="startWithStandUpCheck('squats')" id="squatsBtn">Squats (<span class="rep-count">10</span>)</button>
@@ -135,6 +275,29 @@
     </div>
 
     <script>
+        // Theme handling
+        const themes = ['vscode', 'dracula', 'nord', 'solarized', 'monokai', 'gruvbox', 'tokyo-night', 'catppuccin'];
+        const themeColors = {
+            'vscode': '#4ec9b0', 'dracula': '#bd93f9', 'nord': '#88c0d0', 'solarized': '#2aa198',
+            'monokai': '#a6e22e', 'gruvbox': '#fe8019', 'tokyo-night': '#7aa2f7', 'catppuccin': '#cba6f7'
+        };
+        let currentTheme = localStorage.getItem('vibereps-theme') || 'vscode';
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('vibereps-theme', theme);
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.t === theme);
+            });
+        }
+
+        // Initialize theme
+        setTheme(currentTheme);
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => setTheme(btn.dataset.t));
+        });
+
         let currentExercise = null;
         let repCount = 0;
         let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20, standing_crunches: 10, calf_raises: 15, side_stretches: 10};
@@ -155,8 +318,8 @@
             document.querySelector('#standing_crunchesBtn .rep-count').textContent = quickModeReps.standing_crunches;
             document.querySelector('#calf_raisesBtn .rep-count').textContent = quickModeReps.calf_raises;
             document.querySelector('#side_stretchesBtn .rep-count').textContent = quickModeReps.side_stretches;
-            document.querySelector('h1').innerHTML = '⚡ Quick Exercise Break!';
-            document.querySelector('p').textContent = 'Quick session while Claude works!';
+            document.querySelector('h1').textContent = 'vibereps --quick';
+            document.querySelector('.subtitle').textContent = 'quick session while claude works';
         }
 
         // Exercise name mappings
@@ -187,7 +350,7 @@
 
                 // Hide the selector and show which exercise
                 document.getElementById('exerciseSelector').style.display = 'none';
-                document.querySelector('p').textContent = `Get ready for ${exerciseNames[randomExercise]}!`;
+                document.querySelector('.subtitle').textContent = `starting ${randomExercise.replace('_', ' ')}...`;
 
                 // Auto-start after page loads (with stand-up check)
                 window.addEventListener('load', () => {
@@ -373,15 +536,16 @@
                 // Simple exercise detection logic
                 detectExercise(results.poseLandmarks);
 
-                // Draw skeleton
-                ctx.strokeStyle = '#00FF00';
+                // Draw skeleton (use theme accent color)
+                const accentColor = themeColors[currentTheme] || '#4ec9b0';
+                ctx.strokeStyle = accentColor;
                 ctx.lineWidth = 2;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#00FF00';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = accentColor;
                 drawConnectors(ctx, results.poseLandmarks);
 
                 // Draw joints
-                ctx.fillStyle = '#00FF00';
+                ctx.fillStyle = accentColor;
                 results.poseLandmarks.forEach(landmark => {
                     ctx.beginPath();
                     ctx.arc(landmark.x * 640, landmark.y * 480, 5, 0, 2 * Math.PI);
