@@ -10,23 +10,33 @@ Push shift-tab, push up, push code.
 
 ### Strategy 1: Exercise While Claude Works (Recommended)
 
-**The workflow:** You submit prompt → Do 5 quick exercises → Claude notifies you when ready
+**The workflow:** Claude edits a file → Do 5 quick exercises → Claude notifies you when ready
 
 1. **Set up the hooks** by adding to `~/.claude/settings.json`:
 
    ```json
    {
      "hooks": {
-       "UserPromptSubmit": [
+       "PostToolUse": [
          {
-           "type": "command",
-           "command": "/full/path/to/exercise_tracker.py user_prompt_submit '{}'"
+           "matcher": "Write|Edit",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /full/path/to/exercise_tracker.py post_tool_use '{}'"
+             }
+           ]
          }
        ],
-       "PostMessage": [
+       "Notification": [
          {
-           "type": "command",
-           "command": "/full/path/to/notify_complete.py '{}'"
+           "matcher": "",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "/full/path/to/notify_complete.py '{}'"
+             }
+           ]
          }
        ]
      }
@@ -72,10 +82,14 @@ You return to check the response
 ## 🏋️ Features
 
 - **Real-time pose detection** using MediaPipe AI
-- **Three exercise types:**
+- **Stand-up verification** - ensures you're fully visible before starting
+- **Six exercise types:**
   - Squats (hip-knee-ankle angles)
   - Push-ups (shoulder-elbow-wrist angles)
   - Jumping jacks (arm position tracking)
+  - Standing crunches (elbow-to-knee oblique work)
+  - Calf raises (heel lift detection)
+  - Side stretches (torso tilt tracking)
 - **Two modes:**
   - Quick mode: 5 reps while Claude works ⚡
   - Normal mode: 10+ reps for breaks
@@ -97,7 +111,7 @@ You return to check the response
 ```bash
 # Choose which exercises to use (comma-separated, random selection each time)
 export VIBEREPS_EXERCISES=squats,jumping_jacks   # Only squats and jumping jacks
-export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks  # All exercises
+export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks,standing_crunches,calf_raises,side_stretches  # All exercises
 
 # Remote VibeReps server (optional)
 export VIBEREPS_API_URL=https://your-server.com
@@ -114,8 +128,8 @@ If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from
 Edit `exercise_ui.html` to change target reps:
 
 ```javascript
-let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20};      // Normal mode
-let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10};     // Quick mode
+let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20, standing_crunches: 10, calf_raises: 15, side_stretches: 10};      // Normal mode
+let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10, standing_crunches: 5, calf_raises: 8, side_stretches: 6};     // Quick mode
 ```
 
 ### Change Detection Sensitivity
@@ -130,8 +144,8 @@ if (angle < 80 && exerciseState !== 'down') {  // Default: 100
 ## 🧪 Testing
 
 ```bash
-# Test quick mode
-./exercise_tracker.py user_prompt_submit '{}'
+# Test quick mode with specific exercises
+VIBEREPS_EXERCISES=squats,standing_crunches ./exercise_tracker.py post_tool_use '{}'
 
 # Test notification (run in another terminal while tracker is open)
 ./notify_complete.py '{}'

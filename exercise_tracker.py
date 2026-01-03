@@ -24,6 +24,45 @@ PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")  # Prome
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 
 
+def open_small_window(url: str, width: int = 400, height: int = 650):
+    """Open URL in a small browser window (Chrome app mode preferred)."""
+    import platform
+    import shutil
+
+    system = platform.system()
+
+    # Try Chrome first (best small window experience with --app mode)
+    chrome_paths = []
+    if system == "Darwin":  # macOS
+        chrome_paths = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        ]
+    elif system == "Linux":
+        chrome_paths = [shutil.which("google-chrome"), shutil.which("chromium")]
+    elif system == "Windows":
+        chrome_paths = [
+            os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+        ]
+
+    for chrome in chrome_paths:
+        if chrome and os.path.exists(chrome):
+            try:
+                subprocess.Popen([
+                    chrome,
+                    f"--app={url}",
+                    f"--window-size={width},{height}",
+                    "--window-position=50,50",
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            except Exception:
+                continue
+
+    # Fallback to default browser
+    webbrowser.open(url)
+
+
 def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
     """Send exercise data to remote VibeReps server."""
     if not VIBEREPS_API_URL or not VIBEREPS_API_KEY:
@@ -275,7 +314,7 @@ class ExerciseTrackerHook:
             url = f"http://localhost:{self.port}?quick=true"
             if VIBEREPS_EXERCISES:
                 url += f"&exercises={VIBEREPS_EXERCISES}"
-            webbrowser.open(url)
+            open_small_window(url)
 
             return {"status": "success", "message": "Exercise tracker launched in background"}
 
