@@ -4,7 +4,21 @@
       "Bash(chmod:*)",
       "Bash(pkill:*)",
       "Bash(lsof:*)",
-      "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')"
+      "Bash(/Users/flowclub/code/vibereps/exercise_tracker.py post_tool_use '{}')",
+      "Bash(python3:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "SlashCommand(/code-review:code-review:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(gh pr review:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(curl:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(cut:*)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(docker-compose up:*)"
     ],
     "deny": [],
     "ask": []

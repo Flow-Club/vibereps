@@ -10,13 +10,37 @@ Push shift-tab, push up, push code.
 
 ### Strategy 1: Exercise While Claude Works (Recommended)
 
-**The workflow:** You submit prompt → Do 5 quick exercises → Claude notifies you when ready
+**The workflow:** Claude edits a file → Do 5 quick exercises → Claude notifies you when ready
 
-1. **Set up the hooks using Claude Code's `/hooks` command:**
+1. **Set up the hooks** by adding to `~/.claude/settings.json`:
 
-   ```
-   /hooks add UserPromptSubmit exercise_start /full/path/to/exercise_tracker.py user_prompt_submit {}
-   /hooks add PostMessage claude_ready /full/path/to/notify_complete.py {}
+   ```json
+   {
+     "hooks": {
+       "PostToolUse": [
+         {
+           "matcher": "Write|Edit",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /full/path/to/exercise_tracker.py post_tool_use '{}'"
+             }
+           ]
+         }
+       ],
+       "Notification": [
+         {
+           "matcher": "",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "/full/path/to/notify_complete.py '{}'"
+             }
+           ]
+         }
+       ]
+     }
+   }
    ```
 
    Replace `/full/path/to/` with your actual path (e.g., `/Users/flowclub/code/vibereps/`)
@@ -58,10 +82,14 @@ You return to check the response
 ## 🏋️ Features
 
 - **Real-time pose detection** using MediaPipe AI
-- **Three exercise types:**
+- **Stand-up verification** - ensures you're fully visible before starting
+- **Six exercise types:**
   - Squats (hip-knee-ankle angles)
   - Push-ups (shoulder-elbow-wrist angles)
   - Jumping jacks (arm position tracking)
+  - Standing crunches (elbow-to-knee oblique work)
+  - Calf raises (heel lift detection)
+  - Side stretches (torso tilt tracking)
 - **Two modes:**
   - Quick mode: 5 reps while Claude works ⚡
   - Normal mode: 10+ reps for breaks
@@ -78,63 +106,46 @@ You return to check the response
 
 ## 🔧 Configuration
 
-### Manual Hook Setup (Alternative)
+### Environment Variables (Optional)
 
-If you prefer editing the config file directly, add to `~/.config/claude-code/hooks.json`:
+```bash
+# Choose which exercises to use (comma-separated, random selection each time)
+export VIBEREPS_EXERCISES=squats,jumping_jacks   # Only squats and jumping jacks
+export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks,standing_crunches,calf_raises,side_stretches  # All exercises
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/exercise_tracker.py",
-            "args": ["user_prompt_submit", "{}"]
-          }
-        ]
-      }
-    ],
-    "PostMessage": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/full/path/to/notify_complete.py",
-            "args": ["{}"]
-          }
-        ]
-      }
-    ]
-  }
-}
+# Remote VibeReps server (optional)
+export VIBEREPS_API_URL=https://your-server.com
+export VIBEREPS_API_KEY=your_api_key
+
+# Local Prometheus Pushgateway (optional, for Grafana dashboard)
+export PUSHGATEWAY_URL=http://localhost:9091
 ```
 
-See `hooks.json.example` for a template.
+If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from the list and auto-start it (no manual selection needed).
 
 ### Customize Exercise Reps
 
-Edit `exercise_tracker.py` line ~214-215:
+Edit `exercise_ui.html` to change target reps:
 
 ```javascript
-let quickModeReps = {squats: 10, umping_jacks: 10};
+let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20, standing_crunches: 10, calf_raises: 15, side_stretches: 10};      // Normal mode
+let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10, standing_crunches: 5, calf_raises: 8, side_stretches: 6};     // Quick mode
 ```
 
 ### Change Detection Sensitivity
 
-Make squats require deeper depth in `exercise_tracker.py`:
+Adjust angle thresholds in `exercise_ui.html` (in the detection functions):
 
 ```javascript
-
+// Example: Make squats require deeper depth
 if (angle < 80 && exerciseState !== 'down') {  // Default: 100
 ```
 
 ## 🧪 Testing
 
 ```bash
-# Test quick mode
-./exercise_tracker.py user_prompt_submit '{}'
+# Test quick mode with specific exercises
+VIBEREPS_EXERCISES=squats,standing_crunches ./exercise_tracker.py post_tool_use '{}'
 
 # Test notification (run in another terminal while tracker is open)
 ./notify_complete.py '{}'
@@ -176,9 +187,9 @@ which python3  # Use this path if needed
 
 ## 📚 More Info
 
-- `CLAUDE.md` - Technical architecture and development guide
-- `EXERCISE_TRACKER_SETUP.md` - Detailed setup instructions
-- `mcp_exercise_server.py` - MCP server for progress tracking (optional)
+- `CLAUDE.md` - Technical architecture, remote server setup, and monitoring stack
+- `exercise_ui.html` - UI and pose detection logic (customize reps and sensitivity here)
+- `server/` - Remote server for multi-user stats, leaderboards, and MCP integration
 
 ## 💡 Tips
 
