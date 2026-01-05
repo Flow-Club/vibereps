@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Whiteboard - Claude Code Stats</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Patrick Hand', cursive;
+            min-height: 100vh;
+            background:
+                /* Chalk dust effect */
+                radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%),
+                /* Green chalkboard */
+                linear-gradient(180deg, #2a4a2a 0%, #1d3d1d 50%, #153015 100%);
+            color: #f5f5f5;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* Chalk texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .board-frame {
+            border: 15px solid #5c4033;
+            border-radius: 5px;
+            box-shadow:
+                inset 0 0 30px rgba(0,0,0,0.3),
+                0 10px 30px rgba(0,0,0,0.5);
+            min-height: calc(100vh - 40px);
+            padding: 30px;
+            position: relative;
+        }
+
+        /* Chalk tray */
+        .board-frame::after {
+            content: '';
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 15px;
+            background: linear-gradient(180deg, #5c4033 0%, #3d2817 100%);
+            border-radius: 0 0 5px 5px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 3em;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            font-family: 'Caveat', cursive;
+            font-size: 1.5em;
+            text-align: center;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .stat-section {
+            background: rgba(0,0,0,0.15);
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .section-title {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid currentColor;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title.code { color: #7fff7f; }
+        .section-title.tokens { color: #ffff7f; }
+        .section-title.exercise { color: #ff7f7f; }
+        .section-title.time { color: #7fffff; }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin: 15px 0;
+            font-size: 1.3em;
+        }
+
+        .stat-label {
+            font-family: 'Patrick Hand', cursive;
+            opacity: 0.9;
+        }
+
+        .stat-value {
+            font-family: 'Caveat', cursive;
+            font-size: 1.8em;
+            font-weight: 700;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+        }
+
+        .stat-value.green { color: #7fff7f; }
+        .stat-value.yellow { color: #ffff7f; }
+        .stat-value.red { color: #ff7f7f; }
+        .stat-value.blue { color: #7fffff; }
+        .stat-value.orange { color: #ffb347; }
+        .stat-value.purple { color: #dda0dd; }
+
+        /* Leaderboard style */
+        .leaderboard {
+            margin-top: 30px;
+        }
+
+        .leaderboard-title {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 2em;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffff7f;
+            text-decoration: underline;
+            text-decoration-style: wavy;
+        }
+
+        .exercise-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .bar-label {
+            font-family: 'Patrick Hand', cursive;
+            font-size: 1.2em;
+            width: 150px;
+            text-align: right;
+        }
+
+        .bar-container {
+            flex: 1;
+            height: 35px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            font-family: 'Caveat', cursive;
+            font-size: 1.3em;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .bar-fill.squats { background: linear-gradient(90deg, #ff6b6b, #ff8e8e); }
+        .bar-fill.pushups { background: linear-gradient(90deg, #4ecdc4, #7ee8e2); }
+        .bar-fill.jumping_jacks { background: linear-gradient(90deg, #ffe66d, #fff09e); color: #333; }
+        .bar-fill.standing_crunches { background: linear-gradient(90deg, #a855f7, #c084fc); }
+        .bar-fill.calf_raises { background: linear-gradient(90deg, #fb923c, #fdba74); }
+        .bar-fill.side_stretches { background: linear-gradient(90deg, #38bdf8, #7dd3fc); }
+
+        .bar-value {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: 'Caveat', cursive;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        /* Daily goals section */
+        .goals-section {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .goals-title {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #7fffff;
+        }
+
+        .goal-circles {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .goal-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 5px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .goal-circle::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border-radius: 50%;
+            border: 3px dashed;
+            opacity: 0.3;
+        }
+
+        .goal-circle.reps { border-color: #ff7f7f; }
+        .goal-circle.reps::before { border-color: #ff7f7f; }
+        .goal-circle.sessions { border-color: #7fff7f; }
+        .goal-circle.sessions::before { border-color: #7fff7f; }
+        .goal-circle.tokens { border-color: #ffff7f; }
+        .goal-circle.tokens::before { border-color: #ffff7f; }
+
+        .goal-value {
+            font-family: 'Caveat', cursive;
+            font-size: 2.5em;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .goal-label {
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .goal-target {
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.8em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+
+        /* Refresh indicator */
+        .refresh-info {
+            position: fixed;
+            bottom: 10px;
+            right: 20px;
+            font-family: 'Patrick Hand', cursive;
+            font-size: 0.9em;
+            opacity: 0.5;
+        }
+
+        .refresh-info::before {
+            content: '~ ';
+        }
+
+        /* Loading state */
+        .loading {
+            opacity: 0.5;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Hand-drawn underline effect */
+        .underline {
+            position: relative;
+        }
+
+        .underline::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: currentColor;
+            transform: skewX(-5deg);
+        }
+
+        /* Tally marks for sessions */
+        .tally-marks {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 1.5em;
+            letter-spacing: 3px;
+        }
+
+        /* Arrow annotations */
+        .annotation {
+            font-family: 'Caveat', cursive;
+            font-size: 1em;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 2em; }
+            .stats-grid { gap: 20px; }
+            .stat-row { font-size: 1.1em; }
+            .goal-circles { gap: 20px; }
+            .goal-circle { width: 100px; height: 100px; }
+            .goal-value { font-size: 2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="board-frame">
+        <h1>VIBEREPS GYM</h1>
+        <p class="subtitle">Today's Scoreboard ~ <span id="date"></span></p>
+
+        <div class="stats-grid">
+            <!-- Code Stats -->
+            <div class="stat-section">
+                <div class="section-title code">
+                    <span>CODE</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Lines Added</span>
+                    <span class="stat-value green" id="lines-added">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Lines Removed</span>
+                    <span class="stat-value red" id="lines-removed">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Net Lines</span>
+                    <span class="stat-value blue" id="lines-net">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Edits Accepted</span>
+                    <span class="stat-value purple" id="edits-accepted">--</span>
+                </div>
+            </div>
+
+            <!-- Token Stats -->
+            <div class="stat-section">
+                <div class="section-title tokens">
+                    <span>TOKENS</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Input</span>
+                    <span class="stat-value yellow" id="tokens-input">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Output</span>
+                    <span class="stat-value green" id="tokens-output">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Cache Hits</span>
+                    <span class="stat-value blue" id="tokens-cache">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Cost</span>
+                    <span class="stat-value orange" id="total-cost">$--</span>
+                </div>
+            </div>
+
+            <!-- Time Stats -->
+            <div class="stat-section">
+                <div class="section-title time">
+                    <span>TIME</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">CLI Active</span>
+                    <span class="stat-value blue" id="cli-time">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">User Active</span>
+                    <span class="stat-value green" id="user-time">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Sessions</span>
+                    <span class="stat-value purple" id="sessions">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Efficiency</span>
+                    <span class="stat-value yellow" id="efficiency">--x</span>
+                </div>
+            </div>
+
+            <!-- Exercise Stats -->
+            <div class="stat-section">
+                <div class="section-title exercise">
+                    <span>EXERCISE</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Reps</span>
+                    <span class="stat-value red" id="total-reps">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Sessions</span>
+                    <span class="stat-value orange" id="exercise-sessions">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Exercise Time</span>
+                    <span class="stat-value blue" id="exercise-time">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Last Session</span>
+                    <span class="stat-value purple" id="last-session-reps">-- reps</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exercise Breakdown -->
+        <div class="leaderboard">
+            <div class="leaderboard-title">REPS BY EXERCISE</div>
+            <div class="exercise-bars">
+                <div class="bar-row">
+                    <span class="bar-label">Squats</span>
+                    <div class="bar-container">
+                        <div class="bar-fill squats" id="bar-squats" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-squats" style="width: 60px; text-align: right;">0</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Push-ups</span>
+                    <div class="bar-container">
+                        <div class="bar-fill pushups" id="bar-pushups" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-pushups" style="width: 60px; text-align: right;">0</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Jumping Jacks</span>
+                    <div class="bar-container">
+                        <div class="bar-fill jumping_jacks" id="bar-jumping_jacks" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-jumping_jacks" style="width: 60px; text-align: right;">0</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Standing Crunches</span>
+                    <div class="bar-container">
+                        <div class="bar-fill standing_crunches" id="bar-standing_crunches" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-standing_crunches" style="width: 60px; text-align: right;">0</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Calf Raises</span>
+                    <div class="bar-container">
+                        <div class="bar-fill calf_raises" id="bar-calf_raises" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-calf_raises" style="width: 60px; text-align: right;">0</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Side Stretches</span>
+                    <div class="bar-container">
+                        <div class="bar-fill side_stretches" id="bar-side_stretches" style="width: 0%"></div>
+                    </div>
+                    <span class="stat-value" id="reps-side_stretches" style="width: 60px; text-align: right;">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Goals -->
+        <div class="goals-section">
+            <div class="goals-title">DAILY GOALS</div>
+            <div class="goal-circles">
+                <div class="goal-circle reps">
+                    <span class="goal-value" id="goal-reps-pct">0%</span>
+                    <span class="goal-label">Reps</span>
+                    <span class="goal-target" id="goal-reps-target">0/50</span>
+                </div>
+                <div class="goal-circle sessions">
+                    <span class="goal-value" id="goal-sessions-pct">0%</span>
+                    <span class="goal-label">Sessions</span>
+                    <span class="goal-target" id="goal-sessions-target">0/3</span>
+                </div>
+                <div class="goal-circle tokens">
+                    <span class="goal-value" id="cache-hit-rate">0%</span>
+                    <span class="goal-label">Cache Hit</span>
+                    <span class="goal-target">efficiency</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="refresh-info">
+        refreshes every 30s | <span id="last-update">--</span>
+    </div>
+
+    <script>
+        // Use proxied URL when served from Docker, direct URL otherwise
+        const PROMETHEUS_URL = window.location.port === '8080'
+            ? window.location.origin + '/prometheus'
+            : 'http://localhost:9090';
+
+        // Set today's date
+        document.getElementById('date').textContent = new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        // Format numbers with k/M suffixes
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '--';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+            return Math.round(num).toLocaleString();
+        }
+
+        // Format time duration
+        function formatDuration(seconds) {
+            if (seconds === null || seconds === undefined || isNaN(seconds)) return '--';
+            if (seconds < 60) return Math.round(seconds) + 's';
+            if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+            return (seconds / 3600).toFixed(1) + 'h';
+        }
+
+        // Query Prometheus
+        async function queryPrometheus(query) {
+            try {
+                const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if (data.status === 'success' && data.data.result.length > 0) {
+                    return parseFloat(data.data.result[0].value[1]);
+                }
+                return null;
+            } catch (error) {
+                console.error('Prometheus query failed:', error);
+                return null;
+            }
+        }
+
+        // Query Prometheus for multiple results (by label)
+        async function queryPrometheusMulti(query) {
+            try {
+                const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const results = {};
+                    data.data.result.forEach(r => {
+                        const label = r.metric.exercise || r.metric.type || r.metric.model || 'unknown';
+                        results[label] = parseFloat(r.value[1]);
+                    });
+                    return results;
+                }
+                return {};
+            } catch (error) {
+                console.error('Prometheus query failed:', error);
+                return {};
+            }
+        }
+
+        // Update all stats
+        async function updateStats() {
+            // Code stats
+            const linesAdded = await queryPrometheus('sum(claude_code_lines_of_code_count_total{type="added"})');
+            const linesRemoved = await queryPrometheus('sum(claude_code_lines_of_code_count_total{type="removed"})');
+            const editsAccepted = await queryPrometheus('sum(claude_code_code_edit_tool_decision_total{decision="accept"})');
+
+            document.getElementById('lines-added').textContent = formatNumber(linesAdded);
+            document.getElementById('lines-removed').textContent = formatNumber(linesRemoved);
+            document.getElementById('lines-net').textContent = formatNumber((linesAdded || 0) - (linesRemoved || 0));
+            document.getElementById('edits-accepted').textContent = formatNumber(editsAccepted);
+
+            // Token stats
+            const tokensInput = await queryPrometheus('sum(claude_code_token_usage_tokens_total{type="input"})');
+            const tokensOutput = await queryPrometheus('sum(claude_code_token_usage_tokens_total{type="output"})');
+            const tokensCache = await queryPrometheus('sum(claude_code_token_usage_tokens_total{type="cacheRead"})');
+            const totalCost = await queryPrometheus('sum(claude_code_cost_usage_USD_total)');
+
+            document.getElementById('tokens-input').textContent = formatNumber(tokensInput);
+            document.getElementById('tokens-output').textContent = formatNumber(tokensOutput);
+            document.getElementById('tokens-cache').textContent = formatNumber(tokensCache);
+            document.getElementById('total-cost').textContent = totalCost ? '$' + totalCost.toFixed(2) : '$--';
+
+            // Cache hit rate
+            const cacheHitRate = tokensCache && tokensInput ?
+                Math.round((tokensCache / (tokensCache + tokensInput)) * 100) : 0;
+            document.getElementById('cache-hit-rate').textContent = cacheHitRate + '%';
+
+            // Time stats
+            const cliTime = await queryPrometheus('sum(claude_code_active_time_seconds_total{type="cli"})');
+            const userTime = await queryPrometheus('sum(claude_code_active_time_seconds_total{type="user"})');
+            const sessions = await queryPrometheus('count(count by (session_id)(claude_code_token_usage_tokens_total))');
+
+            document.getElementById('cli-time').textContent = formatDuration(cliTime);
+            document.getElementById('user-time').textContent = formatDuration(userTime);
+            document.getElementById('sessions').textContent = formatNumber(sessions);
+
+            const efficiency = cliTime && userTime ? (cliTime / userTime).toFixed(1) : '--';
+            document.getElementById('efficiency').textContent = efficiency + 'x';
+
+            // Exercise stats
+            const totalReps = await queryPrometheus('sum(exercise_reps_total)');
+            const exerciseSessions = await queryPrometheus('sum(exercise_sessions_total)');
+            const exerciseTime = await queryPrometheus('sum(exercise_duration_seconds_total)');
+            const lastSessionReps = await queryPrometheus('sum(exercise_last_session_reps)');
+
+            document.getElementById('total-reps').textContent = formatNumber(totalReps);
+            document.getElementById('exercise-sessions').textContent = formatNumber(exerciseSessions);
+            document.getElementById('exercise-time').textContent = formatDuration(exerciseTime);
+            document.getElementById('last-session-reps').textContent = (lastSessionReps || 0) + ' reps';
+
+            // Exercise breakdown
+            const repsByExercise = await queryPrometheusMulti('sum by (exercise) (exercise_reps_total)');
+            const exerciseTypes = ['squats', 'pushups', 'jumping_jacks', 'standing_crunches', 'calf_raises', 'side_stretches'];
+            const maxReps = Math.max(...Object.values(repsByExercise), 1);
+
+            exerciseTypes.forEach(exercise => {
+                const reps = repsByExercise[exercise] || 0;
+                const percentage = (reps / maxReps) * 100;
+                document.getElementById(`bar-${exercise}`).style.width = percentage + '%';
+                document.getElementById(`reps-${exercise}`).textContent = formatNumber(reps);
+            });
+
+            // Daily goals
+            const dailyRepsGoal = 50;
+            const dailySessionsGoal = 3;
+            const repsProgress = Math.min(100, Math.round(((totalReps || 0) / dailyRepsGoal) * 100));
+            const sessionsProgress = Math.min(100, Math.round(((exerciseSessions || 0) / dailySessionsGoal) * 100));
+
+            document.getElementById('goal-reps-pct').textContent = repsProgress + '%';
+            document.getElementById('goal-reps-target').textContent = `${totalReps || 0}/${dailyRepsGoal}`;
+            document.getElementById('goal-sessions-pct').textContent = sessionsProgress + '%';
+            document.getElementById('goal-sessions-target').textContent = `${exerciseSessions || 0}/${dailySessionsGoal}`;
+
+            // Update timestamp
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Initial load and auto-refresh
+        updateStats();
+        setInterval(updateStats, 30000);
+    </script>
+</body>
+</html>
