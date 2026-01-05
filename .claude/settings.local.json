@@ -18,7 +18,14 @@
       "Bash(docker-compose restart:*)",
       "Bash(cut:*)",
       "WebFetch(domain:gist.github.com)",
-      "Bash(docker-compose up:*)"
+      "Bash(docker-compose up:*)",
+      "Bash(VIBEREPS_EXERCISES=squats,jumping_jacks /Users/flowclub/code/vibereps/exercise_tracker.py user_prompt_submit '{}')",
+      "Bash(VIBEREPS_EXERCISES=standing_crunches,calf_raises,side_stretches /Users/flowclub/code/vibereps/exercise_tracker.py:*)",
+      "Bash(VIBEREPS_EXERCISES=squats,calf_raises /Users/flowclub/code/vibereps/exercise_tracker.py:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr close:*)",
+      "Bash(git commit:*)",
+      "Bash(VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /Users/flowclub/code/vibereps/exercise_tracker.py:*)"
     ],
     "deny": [],
     "ask": []

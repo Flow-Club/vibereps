@@ -337,6 +337,25 @@
         let standUpVerified = false;
         let pendingExercise = null;
         let calfBaseline = null;  // For calf raise detection
+        let frameBuffer = 0;      // For smoothing/debouncing
+        const REQUIRED_FRAMES = 2; // Frames needed to confirm state change
+
+        // Helper: Check if landmarks are visible enough
+        function isVisible(landmarks, indices, minConfidence = 0.5) {
+            return indices.every(i => landmarks[i] && landmarks[i].visibility > minConfidence);
+        }
+
+        // Helper: Get body scale for normalizing thresholds
+        function getBodyScale(landmarks) {
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+            if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) return 1;
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            const torsoHeight = Math.abs((leftShoulder.y + rightShoulder.y) / 2 - (leftHip.y + rightHip.y) / 2);
+            return Math.max(shoulderWidth, torsoHeight, 0.1);
+        }
 
         // Auto-select random exercise if exercises parameter is provided
         const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
@@ -579,183 +598,225 @@
         }
 
         function detectSquat(landmarks) {
-            // Check hip and knee angles for squat detection
-            const hip = landmarks[23];
-            const knee = landmarks[25];
-            const ankle = landmarks[27];
+            // Check hip and knee angles for squat detection - USE BOTH SIDES
+            const DOWN_ANGLE = 120;
+            const UP_ANGLE = 150;
 
-            // Thresholds (more lenient than before)
-            const DOWN_ANGLE = 120;  // Was 100 - now easier to trigger
-            const UP_ANGLE = 150;    // Was 160 - now easier to count rep
+            // Require visibility of key landmarks
+            if (!isVisible(landmarks, [23, 24, 25, 26, 27, 28], 0.5)) {
+                document.getElementById('status').textContent = 'Position your legs in view';
+                return;
+            }
 
-            if (hip && knee && ankle) {
-                const angle = calculateAngle(hip, knee, ankle);
+            // Average both sides for reliability
+            const leftAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+            const rightAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+            const angle = (leftAngle + rightAngle) / 2;
 
-                // Show angle for debugging
-                const statusEl = document.getElementById('status');
-                if (exerciseState === 'ready' || exerciseState === 'up') {
-                    statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Squat down below ${DOWN_ANGLE}°`;
-                } else if (exerciseState === 'down') {
-                    statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Stand up above ${UP_ANGLE}°`;
-                }
+            const statusEl = document.getElementById('status');
+            if (exerciseState === 'ready' || exerciseState === 'up') {
+                statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Squat down below ${DOWN_ANGLE}°`;
+            } else if (exerciseState === 'down') {
+                statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Stand up above ${UP_ANGLE}°`;
+            }
 
-                if (angle < DOWN_ANGLE && exerciseState !== 'down') {
-                    exerciseState = 'down';
-                    statusEl.textContent = `Good! Now stand up (${Math.round(angle)}°) ⬇️`;
-                } else if (angle > UP_ANGLE && exerciseState === 'down') {
-                    exerciseState = 'up';
-                    repCount++;
-                    updateCounter();
-                }
+            if (angle < DOWN_ANGLE && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = `Good depth! Now stand up (${Math.round(angle)}°)`;
+            } else if (angle > UP_ANGLE && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
             }
         }
 
         function detectPushup(landmarks) {
-            // Detect push-up based on elbow angle
-            const shoulder = landmarks[11];
-            const elbow = landmarks[13];
-            const wrist = landmarks[15];
+            // Detect push-up based on elbow angle - USE BOTH SIDES
+            const DOWN_ANGLE = 90;
+            const UP_ANGLE = 150;
 
-            if (shoulder && elbow && wrist) {
-                const angle = calculateAngle(shoulder, elbow, wrist);
+            // Require visibility of arm landmarks
+            if (!isVisible(landmarks, [11, 12, 13, 14, 15, 16], 0.5)) {
+                document.getElementById('status').textContent = 'Position your arms in view';
+                return;
+            }
 
-                if (angle < 90 && exerciseState !== 'down') {
-                    exerciseState = 'down';
-                    document.getElementById('status').textContent = 'Going down... ⬇️';
-                } else if (angle > 150 && exerciseState === 'down') {
-                    exerciseState = 'up';
-                    repCount++;
-                    updateCounter();
-                }
+            // Average both sides
+            const leftAngle = calculateAngle(landmarks[11], landmarks[13], landmarks[15]);
+            const rightAngle = calculateAngle(landmarks[12], landmarks[14], landmarks[16]);
+            const angle = (leftAngle + rightAngle) / 2;
+
+            const statusEl = document.getElementById('status');
+            if (exerciseState === 'ready' || exerciseState === 'up') {
+                statusEl.textContent = `Elbow angle: ${Math.round(angle)}° - Go down below ${DOWN_ANGLE}°`;
+            } else if (exerciseState === 'down') {
+                statusEl.textContent = `Elbow angle: ${Math.round(angle)}° - Push up above ${UP_ANGLE}°`;
+            }
+
+            if (angle < DOWN_ANGLE && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = `Good! Now push up (${Math.round(angle)}°)`;
+            } else if (angle > UP_ANGLE && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
             }
         }
 
         function detectJumpingJack(landmarks) {
-            // Detect based on arm position
+            // Detect based on arm position - FIXED: require down→up cycle
+            if (!isVisible(landmarks, [11, 12, 15, 16], 0.5)) {
+                document.getElementById('status').textContent = 'Position your arms in view';
+                return;
+            }
+
             const leftWrist = landmarks[15];
             const rightWrist = landmarks[16];
             const leftShoulder = landmarks[11];
             const rightShoulder = landmarks[12];
 
-            if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
-                const armsUp = leftWrist.y < leftShoulder.y && rightWrist.y < rightShoulder.y;
+            const armsUp = leftWrist.y < leftShoulder.y && rightWrist.y < rightShoulder.y;
+            const statusEl = document.getElementById('status');
 
-                if (armsUp && exerciseState !== 'up') {
-                    exerciseState = 'up';
-                    repCount++;
-                    updateCounter();
-                } else if (!armsUp && exerciseState === 'up') {
-                    exerciseState = 'down';
-                }
+            // Initialize to 'down' state if starting fresh
+            if (exerciseState === 'ready') {
+                exerciseState = 'down';
+            }
+
+            if (armsUp && exerciseState === 'down') {
+                // Only count on DOWN→UP transition (not 'ready'→'up')
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+                statusEl.textContent = 'Arms up! Now bring them down';
+            } else if (!armsUp && exerciseState === 'up') {
+                exerciseState = 'down';
+                statusEl.textContent = 'Good! Raise arms above shoulders';
+            } else if (!armsUp && exerciseState === 'down') {
+                statusEl.textContent = 'Raise arms above shoulders!';
             }
         }
 
         function detectStandingCrunch(landmarks) {
             // Standing oblique crunches: elbow toward opposite knee
+            if (!isVisible(landmarks, [13, 14, 23, 24, 25, 26], 0.5)) {
+                document.getElementById('status').textContent = 'Position your full body in view';
+                return;
+            }
+
             const leftElbow = landmarks[13];
             const rightElbow = landmarks[14];
             const leftKnee = landmarks[25];
             const rightKnee = landmarks[26];
-            const leftHip = landmarks[23];
-            const rightHip = landmarks[24];
 
-            if (leftElbow && rightElbow && leftKnee && rightKnee && leftHip && rightHip) {
-                // Calculate distance between elbow and opposite knee
-                const leftToRight = Math.abs(leftElbow.y - rightKnee.y) + Math.abs(leftElbow.x - rightKnee.x);
-                const rightToLeft = Math.abs(rightElbow.y - leftKnee.y) + Math.abs(rightElbow.x - leftKnee.x);
+            // Normalize threshold to body scale
+            const bodyScale = getBodyScale(landmarks);
+            const crunchThreshold = bodyScale * 1.2;  // Relative to body size
 
-                // Check if either side is crunching (elbow close to opposite knee)
-                const crunchThreshold = 0.3;  // Normalized distance
-                const isCrunching = leftToRight < crunchThreshold || rightToLeft < crunchThreshold;
+            // Calculate distance between elbow and opposite knee
+            const leftToRight = Math.abs(leftElbow.y - rightKnee.y) + Math.abs(leftElbow.x - rightKnee.x);
+            const rightToLeft = Math.abs(rightElbow.y - leftKnee.y) + Math.abs(rightElbow.x - leftKnee.x);
+            const minDist = Math.min(leftToRight, rightToLeft);
 
-                const statusEl = document.getElementById('status');
-                if (exerciseState === 'ready' || exerciseState === 'up') {
-                    statusEl.textContent = 'Bring elbow to opposite knee!';
-                }
+            const isCrunching = minDist < crunchThreshold;
+            const statusEl = document.getElementById('status');
 
-                if (isCrunching && exerciseState !== 'down') {
-                    exerciseState = 'down';
-                    statusEl.textContent = 'Good crunch! Now stand up straight';
-                } else if (!isCrunching && exerciseState === 'down') {
-                    exerciseState = 'up';
-                    repCount++;
-                    updateCounter();
-                }
+            if (exerciseState === 'ready') exerciseState = 'up';
+
+            if (exerciseState === 'up') {
+                statusEl.textContent = `Bring elbow to opposite knee! (dist: ${minDist.toFixed(2)})`;
+            }
+
+            if (isCrunching && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = 'Good crunch! Now stand up straight';
+            } else if (!isCrunching && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
             }
         }
 
         function detectCalfRaise(landmarks) {
             // Calf raises: detect heel height relative to baseline
+            if (!isVisible(landmarks, [23, 24, 27, 28], 0.5)) {
+                document.getElementById('status').textContent = 'Position your legs in view';
+                return;
+            }
+
             const leftAnkle = landmarks[27];
             const rightAnkle = landmarks[28];
-            const leftHeel = landmarks[29];
-            const rightHeel = landmarks[30];
             const leftHip = landmarks[23];
             const rightHip = landmarks[24];
 
-            if (leftAnkle && rightAnkle && leftHip && rightHip) {
-                // Use ankle position relative to hip as proxy for heel lift
-                const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
-                const avgHipY = (leftHip.y + rightHip.y) / 2;
-                const legLength = avgAnkleY - avgHipY;
+            const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
+            const avgHipY = (leftHip.y + rightHip.y) / 2;
+            const legLength = avgAnkleY - avgHipY;
 
-                // When on tiptoes, ankles rise (y decreases)
-                // We track the baseline on first detection
-                if (!calfBaseline) {
-                    calfBaseline = avgAnkleY;
-                }
+            // Reset baseline when in down position or starting
+            if (exerciseState === 'ready' || exerciseState === 'down') {
+                calfBaseline = avgAnkleY;  // FIXED: reset each rep
+            }
 
-                const lift = calfBaseline - avgAnkleY;
-                const liftThreshold = legLength * 0.05;  // 5% of leg length
+            const lift = calfBaseline - avgAnkleY;
+            const liftThreshold = legLength * 0.04;  // 4% of leg length
+            const liftPercent = (lift / legLength * 100).toFixed(0);
 
-                const statusEl = document.getElementById('status');
-                if (exerciseState === 'ready' || exerciseState === 'down') {
-                    statusEl.textContent = `Rise up on your toes! (lift: ${(lift * 100).toFixed(0)}%)`;
-                }
+            const statusEl = document.getElementById('status');
 
-                if (lift > liftThreshold && exerciseState !== 'up') {
-                    exerciseState = 'up';
-                    statusEl.textContent = 'Hold it! Now lower down slowly';
-                } else if (lift < liftThreshold * 0.3 && exerciseState === 'up') {
-                    exerciseState = 'down';
-                    repCount++;
-                    updateCounter();
-                }
+            if (exerciseState === 'ready') exerciseState = 'down';
+
+            if (exerciseState === 'down') {
+                statusEl.textContent = `Rise up on your toes! (lift: ${liftPercent}%)`;
+            }
+
+            if (lift > liftThreshold && exerciseState === 'down') {
+                exerciseState = 'up';
+                statusEl.textContent = `Hold it! Now lower down (lift: ${liftPercent}%)`;
+            } else if (lift < liftThreshold * 0.3 && exerciseState === 'up') {
+                exerciseState = 'down';
+                repCount++;
+                updateCounter();
             }
         }
 
         function detectSideStretch(landmarks) {
-            // Side stretches: lean torso left/right with arms overhead
+            // Side stretches: lean torso left/right
+            if (!isVisible(landmarks, [11, 12, 23, 24], 0.5)) {
+                document.getElementById('status').textContent = 'Position your torso in view';
+                return;
+            }
+
             const leftShoulder = landmarks[11];
             const rightShoulder = landmarks[12];
             const leftHip = landmarks[23];
             const rightHip = landmarks[24];
-            const leftWrist = landmarks[15];
-            const rightWrist = landmarks[16];
-            const nose = landmarks[0];
 
-            if (leftShoulder && rightShoulder && leftHip && rightHip && nose) {
-                // Calculate torso tilt
-                const shoulderCenter = (leftShoulder.x + rightShoulder.x) / 2;
-                const hipCenter = (leftHip.x + rightHip.x) / 2;
-                const tilt = shoulderCenter - hipCenter;  // Positive = leaning right
+            // Normalize threshold to body scale
+            const bodyScale = getBodyScale(landmarks);
+            const tiltThreshold = bodyScale * 0.4;  // Relative to body size
 
-                const tiltThreshold = 0.08;  // About 15 degrees
-                const statusEl = document.getElementById('status');
+            // Calculate torso tilt
+            const shoulderCenter = (leftShoulder.x + rightShoulder.x) / 2;
+            const hipCenter = (leftHip.x + rightHip.x) / 2;
+            const tilt = shoulderCenter - hipCenter;
 
-                if (exerciseState === 'ready' || exerciseState === 'center') {
-                    statusEl.textContent = 'Raise arms and lean to one side!';
-                }
+            const statusEl = document.getElementById('status');
 
-                if (Math.abs(tilt) > tiltThreshold && exerciseState !== 'side') {
-                    exerciseState = 'side';
-                    const direction = tilt > 0 ? 'right' : 'left';
-                    statusEl.textContent = `Good stretch ${direction}! Now come back to center`;
-                } else if (Math.abs(tilt) < tiltThreshold * 0.5 && exerciseState === 'side') {
-                    exerciseState = 'center';
-                    repCount++;
-                    updateCounter();
-                }
+            if (exerciseState === 'ready') exerciseState = 'center';
+
+            if (exerciseState === 'center') {
+                statusEl.textContent = `Lean to one side! (tilt: ${(tilt / bodyScale * 100).toFixed(0)}%)`;
+            }
+
+            if (Math.abs(tilt) > tiltThreshold && exerciseState !== 'side') {
+                exerciseState = 'side';
+                const direction = tilt > 0 ? 'right' : 'left';
+                statusEl.textContent = `Good stretch ${direction}! Now come back to center`;
+            } else if (Math.abs(tilt) < tiltThreshold * 0.4 && exerciseState === 'side') {
+                exerciseState = 'center';
+                repCount++;
+                updateCounter();
             }
         }
 
