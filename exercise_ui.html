@@ -261,6 +261,11 @@
             <button onclick="startWithStandUpCheck('standing_crunches')" id="standing_crunchesBtn">Standing Crunches (<span class="rep-count">10</span>)</button>
             <button onclick="startWithStandUpCheck('calf_raises')" id="calf_raisesBtn">Calf Raises (<span class="rep-count">15</span>)</button>
             <button onclick="startWithStandUpCheck('side_stretches')" id="side_stretchesBtn">Side Stretches (<span class="rep-count">10</span>)</button>
+            <button onclick="startWithStandUpCheck('shoulder_shrugs')" id="shoulder_shrugsBtn">Shoulder Shrugs (<span class="rep-count">15</span>)</button>
+            <button onclick="startWithStandUpCheck('high_knees')" id="high_kneesBtn">High Knees (<span class="rep-count">20</span>)</button>
+            <button onclick="startWithStandUpCheck('chin_tucks')" id="chin_tucksBtn">Chin Tucks (<span class="rep-count">10</span>)</button>
+            <button onclick="startWithStandUpCheck('arm_circles')" id="arm_circlesBtn">Arm Circles (<span class="rep-count">10</span>)</button>
+            <button onclick="startWithStandUpCheck('torso_twists')" id="torso_twistsBtn">Torso Twists (<span class="rep-count">10</span>)</button>
         </div>
 
         <div id="videoContainer">
@@ -300,8 +305,8 @@
 
         let currentExercise = null;
         let repCount = 0;
-        let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20, standing_crunches: 10, calf_raises: 15, side_stretches: 10};
-        let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10, standing_crunches: 5, calf_raises: 8, side_stretches: 6};
+        let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20, standing_crunches: 10, calf_raises: 15, side_stretches: 10, shoulder_shrugs: 15, high_knees: 20, chin_tucks: 10, arm_circles: 10, torso_twists: 10};
+        let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10, standing_crunches: 5, calf_raises: 8, side_stretches: 6, shoulder_shrugs: 8, high_knees: 10, chin_tucks: 5, arm_circles: 5, torso_twists: 6};
         let exerciseState = null;
         let pose = null;
         let camera = null;
@@ -318,6 +323,11 @@
             document.querySelector('#standing_crunchesBtn .rep-count').textContent = quickModeReps.standing_crunches;
             document.querySelector('#calf_raisesBtn .rep-count').textContent = quickModeReps.calf_raises;
             document.querySelector('#side_stretchesBtn .rep-count').textContent = quickModeReps.side_stretches;
+            document.querySelector('#shoulder_shrugsBtn .rep-count').textContent = quickModeReps.shoulder_shrugs;
+            document.querySelector('#high_kneesBtn .rep-count').textContent = quickModeReps.high_knees;
+            document.querySelector('#chin_tucksBtn .rep-count').textContent = quickModeReps.chin_tucks;
+            document.querySelector('#arm_circlesBtn .rep-count').textContent = quickModeReps.arm_circles;
+            document.querySelector('#torso_twistsBtn .rep-count').textContent = quickModeReps.torso_twists;
             document.querySelector('h1').textContent = 'vibereps --quick';
             document.querySelector('.subtitle').textContent = 'quick session while claude works';
         }
@@ -329,7 +339,12 @@
             jumping_jacks: 'Jumping Jacks',
             standing_crunches: 'Standing Crunches',
             calf_raises: 'Calf Raises',
-            side_stretches: 'Side Stretches'
+            side_stretches: 'Side Stretches',
+            shoulder_shrugs: 'Shoulder Shrugs',
+            high_knees: 'High Knees',
+            chin_tucks: 'Chin Tucks',
+            arm_circles: 'Arm Circles',
+            torso_twists: 'Torso Twists'
         };
         const allExercises = Object.keys(exerciseNames);
 
@@ -337,6 +352,10 @@
         let standUpVerified = false;
         let pendingExercise = null;
         let calfBaseline = null;  // For calf raise detection
+        let shoulderBaseline = null;  // For shoulder shrugs
+        let chinBaseline = null;  // For chin tucks
+        let armCircleHistory = [];  // For tracking arm circle motion
+        let torsoBaseline = null;  // For torso twists
 
         // Auto-select random exercise if exercises parameter is provided
         const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
@@ -433,6 +452,12 @@
                     currentExercise = pendingExercise;
                     exerciseState = 'ready';
                     repCount = 0;
+                    // Reset all baseline variables for fresh detection
+                    calfBaseline = null;
+                    shoulderBaseline = null;
+                    chinBaseline = null;
+                    armCircleHistory = [];
+                    torsoBaseline = null;
                     document.getElementById('counter').textContent = '0';
                 }, 1000);
                 return true;
@@ -575,6 +600,16 @@
                 detectCalfRaise(landmarks);
             } else if (currentExercise === 'side_stretches') {
                 detectSideStretch(landmarks);
+            } else if (currentExercise === 'shoulder_shrugs') {
+                detectShoulderShrug(landmarks);
+            } else if (currentExercise === 'high_knees') {
+                detectHighKnees(landmarks);
+            } else if (currentExercise === 'chin_tucks') {
+                detectChinTuck(landmarks);
+            } else if (currentExercise === 'arm_circles') {
+                detectArmCircle(landmarks);
+            } else if (currentExercise === 'torso_twists') {
+                detectTorsoTwist(landmarks);
             }
         }
 
@@ -752,6 +787,210 @@
                     const direction = tilt > 0 ? 'right' : 'left';
                     statusEl.textContent = `Good stretch ${direction}! Now come back to center`;
                 } else if (Math.abs(tilt) < tiltThreshold * 0.5 && exerciseState === 'side') {
+                    exerciseState = 'center';
+                    repCount++;
+                    updateCounter();
+                }
+            }
+        }
+
+        function detectShoulderShrug(landmarks) {
+            // Shoulder shrugs: detect shoulder height relative to baseline
+            // Great for releasing neck/upper trap tension from tech neck
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftEar = landmarks[7];
+            const rightEar = landmarks[8];
+            const nose = landmarks[0];
+
+            if (leftShoulder && rightShoulder && nose) {
+                const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+
+                // Establish baseline on first detection
+                if (!shoulderBaseline) {
+                    shoulderBaseline = avgShoulderY;
+                }
+
+                // Calculate lift (negative = shoulders raised, since y increases downward)
+                const lift = shoulderBaseline - avgShoulderY;
+                const liftThreshold = 0.03;  // About 3% of frame height
+
+                const statusEl = document.getElementById('status');
+                if (exerciseState === 'ready' || exerciseState === 'down') {
+                    statusEl.textContent = `Shrug shoulders up toward ears! (lift: ${(lift * 100).toFixed(1)}%)`;
+                }
+
+                if (lift > liftThreshold && exerciseState !== 'up') {
+                    exerciseState = 'up';
+                    statusEl.textContent = 'Hold! Now slowly lower your shoulders';
+                } else if (lift < liftThreshold * 0.3 && exerciseState === 'up') {
+                    exerciseState = 'down';
+                    repCount++;
+                    updateCounter();
+                }
+            }
+        }
+
+        function detectHighKnees(landmarks) {
+            // High knees / marching: detect knee height above hip level
+            // Great for hip flexors which get tight from sitting
+            const leftKnee = landmarks[25];
+            const rightKnee = landmarks[26];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+
+            if (leftKnee && rightKnee && leftHip && rightHip) {
+                const avgHipY = (leftHip.y + rightHip.y) / 2;
+
+                // Check if either knee is raised high (y decreases when raised)
+                const leftKneeRaised = avgHipY - leftKnee.y > 0.05;  // Knee above hip level
+                const rightKneeRaised = avgHipY - rightKnee.y > 0.05;
+                const kneeRaised = leftKneeRaised || rightKneeRaised;
+
+                const statusEl = document.getElementById('status');
+                if (exerciseState === 'ready' || exerciseState === 'down') {
+                    statusEl.textContent = 'March! Lift your knee up high!';
+                }
+
+                if (kneeRaised && exerciseState !== 'up') {
+                    exerciseState = 'up';
+                    const side = leftKneeRaised ? 'left' : 'right';
+                    statusEl.textContent = `Good ${side} knee! Now switch legs`;
+                } else if (!kneeRaised && exerciseState === 'up') {
+                    exerciseState = 'down';
+                    repCount++;
+                    updateCounter();
+                }
+            }
+        }
+
+        function detectChinTuck(landmarks) {
+            // Chin tucks: pull chin back to align ear over shoulder
+            // Excellent for tech neck / forward head posture
+            const nose = landmarks[0];
+            const leftEar = landmarks[7];
+            const rightEar = landmarks[8];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+
+            if (nose && leftShoulder && rightShoulder) {
+                const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+                const earCenterX = leftEar && rightEar ? (leftEar.x + rightEar.x) / 2 : nose.x;
+
+                // Forward head = nose/ear significantly in front of (less x than) shoulders
+                // When viewed from side, tucked chin brings head back over shoulders
+                // Since we're facing camera, we detect the nose moving closer to vertical line of shoulders
+                const forwardDistance = shoulderCenterX - nose.x;
+
+                // Establish baseline on first detection
+                if (!chinBaseline) {
+                    chinBaseline = forwardDistance;
+                }
+
+                // Chin tuck = nose moves back (forwardDistance decreases or becomes more negative)
+                const tuckAmount = chinBaseline - forwardDistance;
+                const tuckThreshold = 0.02;  // Small movement is fine
+
+                const statusEl = document.getElementById('status');
+                if (exerciseState === 'ready' || exerciseState === 'forward') {
+                    statusEl.textContent = 'Pull chin back, make a double chin! Keep eyes level';
+                }
+
+                if (tuckAmount > tuckThreshold && exerciseState !== 'tucked') {
+                    exerciseState = 'tucked';
+                    statusEl.textContent = 'Good tuck! Hold for a moment, then release';
+                } else if (tuckAmount < tuckThreshold * 0.3 && exerciseState === 'tucked') {
+                    exerciseState = 'forward';
+                    repCount++;
+                    updateCounter();
+                }
+            }
+        }
+
+        function detectArmCircle(landmarks) {
+            // Arm circles: track wrist making circular motion
+            // Great for shoulder mobility and rounded shoulder posture
+            const leftWrist = landmarks[15];
+            const rightWrist = landmarks[16];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+
+            if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
+                // Use the wrist that's higher (more active)
+                const wrist = leftWrist.y < rightWrist.y ? leftWrist : rightWrist;
+                const shoulder = leftWrist.y < rightWrist.y ? leftShoulder : rightShoulder;
+
+                // Track wrist position relative to shoulder
+                const relX = wrist.x - shoulder.x;
+                const relY = wrist.y - shoulder.y;
+
+                // Calculate angle from shoulder to wrist
+                const angle = Math.atan2(relY, relX) * 180 / Math.PI;
+
+                // Track angle history to detect circular motion
+                armCircleHistory.push(angle);
+                if (armCircleHistory.length > 30) {
+                    armCircleHistory.shift();
+                }
+
+                const statusEl = document.getElementById('status');
+
+                // Detect if we've gone through a full circle (crossed all quadrants)
+                if (armCircleHistory.length >= 20) {
+                    const hasTop = armCircleHistory.some(a => a < -45 && a > -135);  // Arm up
+                    const hasBottom = armCircleHistory.some(a => a > 45 && a < 135); // Arm down
+                    const hasLeft = armCircleHistory.some(a => Math.abs(a) > 135);   // Arm back
+                    const hasRight = armCircleHistory.some(a => Math.abs(a) < 45);   // Arm forward
+
+                    if (hasTop && hasBottom && hasLeft && hasRight && exerciseState !== 'complete') {
+                        exerciseState = 'complete';
+                        repCount++;
+                        armCircleHistory = [];  // Reset for next circle
+                        updateCounter();
+                    }
+
+                    statusEl.textContent = `Make big arm circles! Angle: ${Math.round(angle)}°`;
+                } else {
+                    statusEl.textContent = 'Extend arms and make big circles!';
+                    exerciseState = 'ready';
+                }
+            }
+        }
+
+        function detectTorsoTwist(landmarks) {
+            // Torso twists: rotate upper body left/right while hips stay forward
+            // Great for spine mobility and lower back relief
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+
+            if (leftShoulder && rightShoulder && leftHip && rightHip) {
+                // Calculate shoulder width (appears to shrink when twisted)
+                const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+                const hipWidth = Math.abs(rightHip.x - leftHip.x);
+
+                // Twist ratio: when you twist, shoulders narrow relative to hips
+                const twistRatio = shoulderWidth / hipWidth;
+
+                // Establish baseline on first detection
+                if (!torsoBaseline) {
+                    torsoBaseline = twistRatio;
+                }
+
+                // Calculate twist amount (ratio decreases when twisted)
+                const twistAmount = torsoBaseline - twistRatio;
+                const twistThreshold = 0.15;  // About 15% narrowing
+
+                const statusEl = document.getElementById('status');
+                if (exerciseState === 'ready' || exerciseState === 'center') {
+                    statusEl.textContent = `Twist your torso left or right! (twist: ${(twistAmount * 100).toFixed(0)}%)`;
+                }
+
+                if (twistAmount > twistThreshold && exerciseState !== 'twisted') {
+                    exerciseState = 'twisted';
+                    statusEl.textContent = 'Good twist! Hold briefly, then return to center';
+                } else if (twistAmount < twistThreshold * 0.3 && exerciseState === 'twisted') {
                     exerciseState = 'center';
                     repCount++;
                     updateCounter();
