@@ -147,7 +147,7 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     quick_mode = False
 
     def do_GET(self):
-        """Serve the exercise tracker HTML"""
+        """Serve the exercise tracker HTML and exercise definitions"""
         # Parse path without query parameters
         from urllib.parse import urlparse
         parsed_path = urlparse(self.path).path
@@ -169,6 +169,28 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 "exercise_complete": ExerciseHTTPHandler.exercise_complete
             }
             self.wfile.write(json.dumps(status).encode())
+        elif parsed_path == '/exercises':
+            # List all exercise definitions
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            exercises = self.get_exercise_list()
+            self.wfile.write(json.dumps(exercises).encode())
+        elif parsed_path.startswith('/exercises/') and parsed_path.endswith('.json'):
+            # Serve individual exercise file
+            filename = parsed_path.split('/')[-1]
+            exercise_content = self.get_exercise_file(filename)
+
+            if exercise_content:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(exercise_content.encode())
+            else:
+                self.send_error(404, f"Exercise file not found: {filename}")
         else:
             self.send_error(404)
 
@@ -227,6 +249,56 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             return html_path.read_text()
         except FileNotFoundError:
             return "<html><body><h1>Error: exercise_ui.html not found</h1></body></html>"
+
+    def get_exercise_list(self):
+        """Get list of all exercise definitions from exercises directory"""
+        exercises_dir = Path(__file__).parent / "exercises"
+        exercises = []
+
+        if exercises_dir.exists():
+            for json_file in sorted(exercises_dir.glob("*.json")):
+                # Skip template and schema files
+                if json_file.name.startswith("_"):
+                    continue
+
+                try:
+                    content = json.loads(json_file.read_text())
+                    exercises.append({
+                        "id": content.get("id", json_file.stem),
+                        "name": content.get("name", json_file.stem),
+                        "description": content.get("description", ""),
+                        "category": content.get("category", "general"),
+                        "reps": content.get("reps", {"normal": 10, "quick": 5}),
+                        "file": json_file.name
+                    })
+                except (json.JSONDecodeError, KeyError) as e:
+                    # Skip invalid files
+                    continue
+
+        return exercises
+
+    def get_exercise_file(self, filename):
+        """Get content of a specific exercise file"""
+        # Security: only allow .json files from exercises directory
+        if not filename.endswith('.json') or '/' in filename or '\\' in filename:
+            return None
+
+        exercises_dir = Path(__file__).parent / "exercises"
+        file_path = exercises_dir / filename
+
+        # Ensure file is within exercises directory (prevent path traversal)
+        try:
+            file_path = file_path.resolve()
+            exercises_dir = exercises_dir.resolve()
+            if not str(file_path).startswith(str(exercises_dir)):
+                return None
+        except (ValueError, OSError):
+            return None
+
+        if file_path.exists() and file_path.is_file():
+            return file_path.read_text()
+
+        return None
 
 
 class ExerciseTrackerHook:

@@ -1,0 +1,33 @@
+{
+  "id": "high_knees",
+  "name": "High Knees",
+  "description": "Activates hip flexors that get tight from prolonged sitting",
+  "category": "cardio",
+
+  "reps": {
+    "normal": 20,
+    "quick": 10
+  },
+
+  "detection": {
+    "type": "height_relative",
+    "landmarks": {
+      "target": [25, 26],
+      "reference": [23, 24],
+      "_names": ["knees", "hips"]
+    },
+    "thresholds": {
+      "trigger": 0.05
+    },
+    "condition": "above",
+    "mode": "either",
+    "states": ["ready", "up", "down"],
+    "countOn": "down"
+  },
+
+  "instructions": {
+    "ready": "March! Lift your knee up high!",
+    "up": "Good knee! Now switch legs",
+    "down": "Lift the other knee!"
+  }
+}
