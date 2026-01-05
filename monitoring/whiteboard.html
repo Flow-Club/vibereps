@@ -529,10 +529,7 @@
     </div>
 
     <script>
-        // Use proxied URL when served from Docker, direct URL otherwise
-        const PROMETHEUS_URL = window.location.port === '8080'
-            ? window.location.origin + '/prometheus'
-            : 'http://localhost:9090';
+        const PROMETHEUS_URL = 'http://localhost:9090';
 
         // Set today's date
         document.getElementById('date').textContent = new Date().toLocaleDateString('en-US', {

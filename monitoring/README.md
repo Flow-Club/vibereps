@@ -16,20 +16,21 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 
 ## Access
 
-- **Gym Whiteboard**: http://localhost:8080 (custom chalk-style dashboard)
 - **Grafana**: http://localhost:3030 (admin / vibereps)
 - **Prometheus**: http://localhost:9090
+- **Gym Whiteboard**: Open `monitoring/whiteboard.html` directly in browser
 
 ### Gym Whiteboard Dashboard
 
-A custom gym-style scoreboard showing:
-- **Code stats**: Lines added/removed, edits accepted
-- **Token usage**: Input/output tokens, cache hits, cost
-- **Time stats**: CLI time, user time, efficiency ratio
-- **Exercise reps**: By exercise type with visual bars
-- **Daily goals**: Progress toward rep and session targets
+A custom gym-style chalkboard showing tokens, code stats, and exercise reps.
 
-The whiteboard auto-refreshes every 30 seconds.
+```bash
+# Just open the file directly
+open monitoring/whiteboard.html      # macOS
+xdg-open monitoring/whiteboard.html  # Linux
+```
+
+The dashboard fetches data from Prometheus (CORS enabled) and auto-refreshes every 30 seconds.
 
 ## Available Metrics
 

@@ -25,6 +25,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+      - '--web.cors.origin=*'
     restart: unless-stopped
 
   # Grafana - visualize metrics
@@ -48,17 +49,6 @@ services:
     container_name: pushgateway
     ports:
       - "9091:9091"
-    restart: unless-stopped
-
-  # Gym Whiteboard Dashboard - custom stats display
-  whiteboard:
-    image: nginx:alpine
-    container_name: whiteboard
-    volumes:
-      - ./whiteboard.html:/usr/share/nginx/html/index.html:ro
-      - ./nginx-whiteboard.conf:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "8080:80"
     restart: unless-stopped
 
 volumes:
