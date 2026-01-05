@@ -1,0 +1,36 @@
+{
+  "id": "arm_circles",
+  "name": "Arm Circles",
+  "description": "Improves shoulder mobility and counters rounded shoulder posture",
+  "category": "mobility",
+
+  "reps": {
+    "normal": 10,
+    "quick": 5
+  },
+
+  "detection": {
+    "type": "quadrant_tracking",
+    "landmarks": {
+      "wrist": [15, 16],
+      "shoulder": [11, 12],
+      "_names": ["wrists", "shoulders"]
+    },
+    "historyLength": 30,
+    "minHistoryForDetection": 20,
+    "quadrants": {
+      "top": {"min": -135, "max": -45},
+      "bottom": {"min": 45, "max": 135},
+      "left": {"min": 135, "max": -135},
+      "right": {"min": -45, "max": 45}
+    },
+    "states": ["ready", "circling", "complete"],
+    "countOn": "complete"
+  },
+
+  "instructions": {
+    "ready": "Extend arms and make big circles!",
+    "circling": "Keep going around!",
+    "complete": "Full circle! Keep going"
+  }
+}

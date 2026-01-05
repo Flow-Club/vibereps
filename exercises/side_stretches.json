@@ -1,0 +1,32 @@
+{
+  "id": "side_stretches",
+  "name": "Side Stretches",
+  "description": "Stretches obliques and improves lateral spine mobility",
+  "category": "mobility",
+
+  "reps": {
+    "normal": 10,
+    "quick": 6
+  },
+
+  "detection": {
+    "type": "tilt",
+    "landmarks": {
+      "upper": [11, 12],
+      "lower": [23, 24],
+      "_names": ["shoulders", "hips"]
+    },
+    "thresholds": {
+      "trigger": 0.08,
+      "release": 0.04
+    },
+    "states": ["ready", "center", "side"],
+    "countOn": "center"
+  },
+
+  "instructions": {
+    "ready": "Raise arms and lean to one side!",
+    "side": "Good stretch! Now come back to center",
+    "center": "Now lean to the other side!"
+  }
+}

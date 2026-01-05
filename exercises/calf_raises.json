@@ -1,0 +1,33 @@
+{
+  "id": "calf_raises",
+  "name": "Calf Raises",
+  "description": "Improves circulation and strengthens calves, great for desk workers",
+  "category": "strength",
+
+  "reps": {
+    "normal": 15,
+    "quick": 8
+  },
+
+  "detection": {
+    "type": "height_baseline",
+    "landmarks": {
+      "primary": [27, 28],
+      "reference": [23, 24],
+      "_names": ["ankles", "hips"]
+    },
+    "thresholds": {
+      "trigger": 0.05,
+      "release": 0.015
+    },
+    "baseline": "leg_length_ratio",
+    "states": ["ready", "up", "down"],
+    "countOn": "down"
+  },
+
+  "instructions": {
+    "ready": "Rise up on your toes!",
+    "up": "Hold it! Now lower down slowly",
+    "down": "Good rep! Rise again"
+  }
+}

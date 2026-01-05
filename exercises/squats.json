@@ -1,0 +1,31 @@
+{
+  "id": "squats",
+  "name": "Squats",
+  "description": "Strengthens legs and glutes, counters hip flexor tightness from sitting",
+  "category": "strength",
+
+  "reps": {
+    "normal": 10,
+    "quick": 5
+  },
+
+  "detection": {
+    "type": "angle",
+    "landmarks": {
+      "joint": [23, 25, 27],
+      "_names": ["left_hip", "left_knee", "left_ankle"]
+    },
+    "thresholds": {
+      "down": 120,
+      "up": 150
+    },
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
+  },
+
+  "instructions": {
+    "ready": "Squat down below {down}°",
+    "down": "Good! Now stand up",
+    "up": "Great rep! Go again"
+  }
+}
