@@ -24,7 +24,7 @@ PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")  # Prome
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 
 
-def open_small_window(url: str, width: int = 400, height: int = 650):
+def open_small_window(url: str, width: int = 340, height: int = 520):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
@@ -54,6 +54,7 @@ def open_small_window(url: str, width: int = 400, height: int = 650):
                     f"--app={url}",
                     f"--window-size={width},{height}",
                     "--window-position=50,50",
+                    "--user-data-dir=/tmp/vibereps-chrome",
                 ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return
             except Exception:

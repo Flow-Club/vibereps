@@ -261,7 +261,7 @@
 
         <div id="videoContainer">
             <video id="video" autoplay playsinline muted></video>
-            <canvas id="canvas" width="640" height="480"></canvas>
+            <canvas id="canvas" width="320" height="240"></canvas>
         </div>
 
         <div class="counter" id="counter">0</div>
@@ -417,7 +417,7 @@ const selector = document.getElementById('exerciseSelector');
             try {
                 const video = document.getElementById('video');
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 }
+                    video: { width: 320, height: 240 }
                 });
                 video.srcObject = stream;
                 document.getElementById('videoContainer').classList.add('active');
@@ -430,8 +430,8 @@ const selector = document.getElementById('exerciseSelector');
                 if (typeof Camera !== 'undefined') {
                     camera = new Camera(video, {
                         onFrame: async () => { await pose.send({image: video}); },
-                        width: 640,
-                        height: 480
+                        width: 320,
+                        height: 240
                     });
                     await camera.start();
                 }
@@ -527,7 +527,7 @@ const selector = document.getElementById('exerciseSelector');
                 ctx.fillStyle = accentColor;
                 results.poseLandmarks.forEach(landmark => {
                     ctx.beginPath();
-                    ctx.arc(landmark.x * 640, landmark.y * 480, 5, 0, 2 * Math.PI);
+                    ctx.arc(landmark.x * 320, landmark.y * 240, 3, 0, 2 * Math.PI);
                     ctx.fill();
                 });
             }
@@ -1271,8 +1271,8 @@ const selector = document.getElementById('exerciseSelector');
             connections.forEach(([start, end]) => {
                 if (landmarks[start] && landmarks[end]) {
                     ctx.beginPath();
-                    ctx.moveTo(landmarks[start].x * 640, landmarks[start].y * 480);
-                    ctx.lineTo(landmarks[end].x * 640, landmarks[end].y * 480);
+                    ctx.moveTo(landmarks[start].x * 320, landmarks[start].y * 240);
+                    ctx.lineTo(landmarks[end].x * 320, landmarks[end].y * 240);
                     ctx.stroke();
                 }
             });
