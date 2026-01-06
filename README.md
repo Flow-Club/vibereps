@@ -6,62 +6,39 @@ Push shift-tab, push up, push code.
 
 ---
 
-## 🎯 Quick Start
+## 🚀 One-Line Install
 
-### Strategy 1: Exercise While Claude Works (Recommended)
+```bash
+curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
+```
+
+That's it! Restart Claude Code and you're ready to get jacked.
+
+<details>
+<summary><b>Alternative: Install from local clone</b></summary>
+
+```bash
+git clone https://github.com/Flow-Club/vibereps.git
+cd vibereps
+./install.sh
+```
+
+</details>
+
+<details>
+<summary><b>Uninstall</b></summary>
+
+```bash
+~/.vibereps/install.sh --uninstall
+```
+
+</details>
+
+---
+
+## 🎯 How It Works
 
 **The workflow:** Claude edits a file → Do 5 quick exercises → Claude notifies you when ready
-
-1. **Set up the hooks** by adding to `~/.claude/settings.json`:
-
-   ```json
-   {
-     "hooks": {
-       "PostToolUse": [
-         {
-           "matcher": "Write|Edit",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /full/path/to/exercise_tracker.py post_tool_use '{}'"
-             }
-           ]
-         }
-       ],
-       "Notification": [
-         {
-           "matcher": "",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "/full/path/to/notify_complete.py '{}'"
-             }
-           ]
-         }
-       ]
-     }
-   }
-   ```
-
-   Replace `/full/path/to/` with your actual path (e.g., `/Users/flowclub/code/vibereps/`)
-
-2. **Test it:**
-
-   ```bash
-   # Terminal 1: Start exercise tracker
-   ./exercise_tracker.py user_prompt_submit '{}'
-
-   # Terminal 2: Simulate Claude completion
-   ./notify_complete.py '{}'
-   ```
-
-3. **Use it:**
-   - Submit any prompt to Claude Code
-   - Exercise tracker opens automatically with quick exercises (5 reps)
-   - Do your exercises while Claude works
-   - Get a desktop notification when Claude is ready!
-
-### How It Works
 
 ```
 You: "Hey Claude, refactor this code"
@@ -78,6 +55,42 @@ Claude: "Here's your refactored code"
     ↓
 You return to check the response
 ```
+
+<details>
+<summary><b>Manual setup (if not using installer)</b></summary>
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /path/to/exercise_tracker.py post_tool_use '{}'"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/notify_complete.py '{}'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+</details>
 
 ## 🏋️ Features
 
