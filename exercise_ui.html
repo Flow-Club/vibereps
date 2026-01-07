@@ -238,6 +238,64 @@
         .theme-btn[data-t="tokyo-night"] { background: #7aa2f7; }
         .theme-btn[data-t="catppuccin"] { background: #cba6f7; }
         .loading { text-align: center; color: var(--text-dim); padding: 20px; }
+
+        /* Camera selector - terminal style */
+        .camera-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 8px 0;
+            padding: 6px 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            font-size: 11px;
+        }
+        .camera-selector::before {
+            content: ">";
+            color: var(--accent);
+            font-weight: bold;
+        }
+        .camera-selector label {
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+        .camera-selector select {
+            flex: 1;
+            min-width: 0;
+            padding: 4px 6px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23808080' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            padding-right: 20px;
+        }
+        .camera-selector select:hover {
+            border-color: var(--accent);
+        }
+        .camera-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+        .camera-selector select option {
+            background: var(--bg-light);
+            color: var(--text);
+            padding: 4px;
+        }
+        .camera-selector .cam-status {
+            color: var(--success);
+            font-size: 10px;
+        }
+        .camera-selector .cam-status.error {
+            color: var(--warn);
+        }
     </style>
 </head>
 <body>
@@ -254,6 +312,14 @@
         </div>
         <h1 id="title">vibereps</h1>
         <p class="subtitle" id="subtitle">time to move</p>
+
+        <div class="camera-selector" id="cameraSelector">
+            <label>cam:</label>
+            <select id="cameraSelect">
+                <option value="">detecting...</option>
+            </select>
+            <span class="cam-status" id="camStatus"></span>
+        </div>
 
         <div class="exercise-selector" id="exerciseSelector">
             <div class="loading">Loading exercises...</div>
@@ -308,6 +374,7 @@
         let startTime = null;
         let statusPollInterval = null;
         let isQuickMode = new URLSearchParams(window.location.search).get('quick') === 'true';
+        let selectedCameraId = localStorage.getItem('vibereps-camera') || '';
 
         // Detection state (baselines, history)
         let detectionState = {};
@@ -416,8 +483,16 @@ const selector = document.getElementById('exerciseSelector');
 
             try {
                 const video = document.getElementById('video');
+                const videoConstraints = {
+                    width: 320,
+                    height: 240
+                };
+                // Use selected camera if available
+                if (selectedCameraId) {
+                    videoConstraints.deviceId = { exact: selectedCameraId };
+                }
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 320, height: 240 }
+                    video: videoConstraints
                 });
                 video.srcObject = stream;
                 document.getElementById('videoContainer').classList.add('active');
@@ -1396,8 +1471,72 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         // ============================================
+        // Camera selection
+        // ============================================
+        async function enumerateCameras() {
+            const select = document.getElementById('cameraSelect');
+            const status = document.getElementById('camStatus');
+
+            try {
+                // Need to request permission first to get device labels
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(d => d.kind === 'videoinput');
+
+                select.innerHTML = '';
+
+                if (cameras.length === 0) {
+                    select.innerHTML = '<option value="">no cameras found</option>';
+                    status.textContent = '✗';
+                    status.className = 'cam-status error';
+                    return;
+                }
+
+                cameras.forEach((cam, i) => {
+                    const option = document.createElement('option');
+                    option.value = cam.deviceId;
+                    // Truncate long names, show index
+                    const label = cam.label || `Camera ${i + 1}`;
+                    option.textContent = label.length > 30 ? label.substring(0, 27) + '...' : label;
+                    option.title = label; // Full name on hover
+                    select.appendChild(option);
+                });
+
+                // Restore previous selection if still available
+                if (selectedCameraId && cameras.some(c => c.deviceId === selectedCameraId)) {
+                    select.value = selectedCameraId;
+                } else {
+                    selectedCameraId = cameras[0].deviceId;
+                    select.value = selectedCameraId;
+                }
+
+                status.textContent = `✓ ${cameras.length}`;
+                status.className = 'cam-status';
+
+            } catch (err) {
+                console.error('Camera enumeration failed:', err);
+                select.innerHTML = '<option value="">permission denied</option>';
+                status.textContent = '✗';
+                status.className = 'cam-status error';
+            }
+        }
+
+        document.getElementById('cameraSelect').addEventListener('change', (e) => {
+            selectedCameraId = e.target.value;
+            localStorage.setItem('vibereps-camera', selectedCameraId);
+            document.getElementById('camStatus').textContent = '✓ saved';
+            setTimeout(() => {
+                const cameras = document.getElementById('cameraSelect').options.length;
+                document.getElementById('camStatus').textContent = `✓ ${cameras}`;
+            }, 1000);
+        });
+
+        // ============================================
         // Initialize on page load
         // ============================================
+        enumerateCameras();
         loadExercises();
     </script>
 </body>

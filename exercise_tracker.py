@@ -17,6 +17,11 @@ import urllib.request
 import urllib.error
 
 
+# Quick disable - set VIBEREPS_DISABLED=1 to skip exercise tracking
+if os.getenv("VIBEREPS_DISABLED", ""):
+    print('{"status": "skipped", "message": "VIBEREPS_DISABLED is set"}')
+    sys.exit(0)
+
 # Configuration - set these environment variables or edit directly
 VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
 VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
