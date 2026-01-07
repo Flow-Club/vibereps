@@ -1,0 +1,33 @@
+{
+  "id": "standing_crunches",
+  "name": "Standing Crunches",
+  "description": "Core exercise targeting obliques, great alternative to floor crunches",
+  "category": "strength",
+
+  "reps": {
+    "normal": 10,
+    "quick": 5
+  },
+
+  "detection": {
+    "type": "distance",
+    "landmarks": {
+      "pairs": [
+        {"from": 13, "to": 26, "_names": ["left_elbow", "right_knee"]},
+        {"from": 14, "to": 25, "_names": ["right_elbow", "left_knee"]}
+      ]
+    },
+    "thresholds": {
+      "trigger": 0.3
+    },
+    "mode": "either",
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
+  },
+
+  "instructions": {
+    "ready": "Bring elbow to opposite knee!",
+    "down": "Good crunch! Now stand up straight",
+    "up": "Switch sides!"
+  }
+}

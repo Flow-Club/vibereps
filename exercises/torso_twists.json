@@ -1,0 +1,32 @@
+{
+  "id": "torso_twists",
+  "name": "Torso Twists",
+  "description": "Increases spine mobility and relieves lower back tension",
+  "category": "mobility",
+
+  "reps": {
+    "normal": 10,
+    "quick": 6
+  },
+
+  "detection": {
+    "type": "width_ratio",
+    "landmarks": {
+      "upper": [11, 12],
+      "lower": [23, 24],
+      "_names": ["shoulders", "hips"]
+    },
+    "thresholds": {
+      "trigger": 0.15,
+      "release": 0.045
+    },
+    "states": ["ready", "center", "twisted"],
+    "countOn": "center"
+  },
+
+  "instructions": {
+    "ready": "Twist your torso left or right!",
+    "twisted": "Good twist! Hold briefly, then return to center",
+    "center": "Now twist to the other side!"
+  }
+}
