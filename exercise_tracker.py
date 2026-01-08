@@ -17,6 +17,49 @@ import urllib.request
 import urllib.error
 
 
+# Handle --list-exercises before anything else
+if len(sys.argv) > 1 and sys.argv[1] in ("--list-exercises", "-l"):
+    exercises_dir = Path(__file__).parent / "exercises"
+    print("Available exercises:\n")
+    for json_file in sorted(exercises_dir.glob("*.json")):
+        if json_file.name.startswith("_"):
+            continue
+        try:
+            content = json.loads(json_file.read_text())
+            name = content.get("name", json_file.stem)
+            desc = content.get("description", "")
+            quick_reps = content.get("reps", {}).get("quick", 5)
+            print(f"  {json_file.stem:20} {name} ({quick_reps} reps)")
+            if desc:
+                print(f"  {' '*20} {desc[:60]}")
+        except (json.JSONDecodeError, KeyError):
+            continue
+    print("\nSet VIBEREPS_EXERCISES to choose exercises:")
+    print("  export VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises")
+    sys.exit(0)
+
+# Handle --help
+if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+    print("""VibeReps Exercise Tracker
+
+Usage:
+  exercise_tracker.py [event_type] [data]    Run as Claude Code hook
+  exercise_tracker.py --list-exercises       List available exercises
+  exercise_tracker.py --help                 Show this help
+
+Event types:
+  post_tool_use     Quick mode (5 reps while Claude works)
+  user_prompt_submit Quick mode (5 reps while Claude works)
+  task_complete     Normal mode (10 reps after Claude finishes)
+
+Environment variables:
+  VIBEREPS_EXERCISES   Comma-separated list of exercises to use
+  VIBEREPS_DISABLED    Set to 1 to disable tracking
+  VIBEREPS_API_URL     Remote server URL for logging
+  VIBEREPS_API_KEY     API key for remote server
+""")
+    sys.exit(0)
+
 # Quick disable - set VIBEREPS_DISABLED=1 to skip exercise tracking
 if os.getenv("VIBEREPS_DISABLED", ""):
     print('{"status": "skipped", "message": "VIBEREPS_DISABLED is set"}')
