@@ -47,10 +47,16 @@ Based on answers, add to `~/.claude/settings.json`:
 {
   "hooks": {
     "PostToolUse": [{
-      "matcher": "Write|Edit",
+      "matcher": "Write|Edit|MultiEdit",
       "hooks": [{
         "type": "command",
-        "command": "VIBEREPS_EXERCISES={exercises} /path/to/exercise_tracker.py post_tool_use '{}'"
+        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py post_tool_use '{}'"
+      }]
+    }],
+    "Notification": [{
+      "hooks": [{
+        "type": "command",
+        "command": "{vibereps_dir}/notify_complete.py '{}'"
       }]
     }]
   }
@@ -64,12 +70,21 @@ Based on answers, add to `~/.claude/settings.json`:
     "TaskComplete": [{
       "hooks": [{
         "type": "command",
-        "command": "VIBEREPS_EXERCISES={exercises} /path/to/exercise_tracker.py task_complete '{}'"
+        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py task_complete '{}'"
+      }]
+    }],
+    "Notification": [{
+      "hooks": [{
+        "type": "command",
+        "command": "{vibereps_dir}/notify_complete.py '{}'"
       }]
     }]
   }
 }
 ```
+
+Replace `{vibereps_dir}` with the actual path (e.g., `~/.vibereps` or the repo path).
+Replace `{exercises}` with comma-separated exercise list (e.g., `squats,jumping_jacks,calf_raises`).
 
 ### Step 4: Test
 
@@ -80,9 +95,20 @@ Run a quick test:
 
 ## Important Paths
 
-- Hook script: `/Users/flowclub/code/vibereps/exercise_tracker.py`
-- UI file: `/Users/flowclub/code/vibereps/exercise_ui.html`
+- Hook script: Use `$PWD/exercise_tracker.py` if in repo, or `~/.vibereps/exercise_tracker.py` if installed via curl
+- UI file: `exercise_ui.html` (same directory as hook script)
 - Settings: `~/.claude/settings.json`
+
+## Detecting Install Location
+
+Check which exists:
+```bash
+if [[ -f "$HOME/.vibereps/exercise_tracker.py" ]]; then
+    VIBEREPS_DIR="$HOME/.vibereps"
+elif [[ -f "./exercise_tracker.py" ]]; then
+    VIBEREPS_DIR="$(pwd)"
+fi
+```
 
 ## Disable Later
 

@@ -2,22 +2,21 @@
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/flowclub/code/vibereps/exercise_tracker.py",
-            "args": ["post_tool_use", "{}"]
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches ~/.vibereps/exercise_tracker.py post_tool_use '{}'"
           }
         ]
       }
     ],
-    "PostMessage": [
+    "Notification": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/flowclub/code/vibereps/notify_complete.py",
-            "args": ["{}"]
+            "command": "~/.vibereps/notify_complete.py '{}'"
           }
         ]
       }
