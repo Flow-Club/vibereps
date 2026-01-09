@@ -1,0 +1,24 @@
+{
+  "name": "vibereps",
+  "version": "0.1.0",
+  "description": "Exercise tracking for vibe coders - get jacked while Claude works",
+  "type": "module",
+  "bin": {
+    "vibereps": "./bin/vibereps.js"
+  },
+  "scripts": {
+    "start": "node src/tracker.js",
+    "stats": "node src/stats.js"
+  },
+  "keywords": [
+    "claude-code",
+    "exercise",
+    "fitness",
+    "vibe-coding"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "ccusage": "^17.2.1",
+    "open": "^10.1.0"
+  }
+}
