@@ -408,36 +408,59 @@ class ExerciseTrackerHook:
     def handle_hook(self, event_type, data):
         """Main hook handler"""
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
-            # Launch as detached background process
-            script_path = os.path.abspath(__file__)
+            # Use a lock file to prevent race conditions when multiple hooks fire
+            lock_file = Path("/tmp/vibereps-launch.lock")
 
-            # Check if server is already running
+            # Try to acquire lock (atomic check-and-create)
             try:
-                import urllib.request
-                urllib.request.urlopen("http://localhost:8765/status", timeout=1)
-                # Server already running, skip
-                return {"status": "skipped", "message": "Exercise tracker already running"}
-            except BaseException:
-                # Server not running, launch it
-                pass
+                # O_CREAT | O_EXCL ensures atomic creation - fails if file exists
+                fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+            except FileExistsError:
+                # Another hook is already launching, check if it's stale (> 10s old)
+                try:
+                    if time.time() - lock_file.stat().st_mtime < 10:
+                        return {"status": "skipped", "message": "Another hook is launching exercise tracker"}
+                    # Lock is stale, remove it and retry
+                    lock_file.unlink(missing_ok=True)
+                    fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                    os.write(fd, str(os.getpid()).encode())
+                    os.close(fd)
+                except (FileExistsError, OSError):
+                    return {"status": "skipped", "message": "Exercise tracker launch in progress"}
 
-            # Launch detached background process
-            subprocess.Popen(
-                [sys.executable, script_path, "--daemon"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                start_new_session=True  # Detach from parent
-            )
+            try:
+                # Check if server is already running
+                try:
+                    urllib.request.urlopen("http://localhost:8765/status", timeout=1)
+                    # Server already running, skip
+                    return {"status": "skipped", "message": "Exercise tracker already running"}
+                except BaseException:
+                    # Server not running, launch it
+                    pass
 
-            # Give server a moment to start, then open browser from this process
-            time.sleep(0.5)
-            url = f"http://localhost:{self.port}?quick=true"
-            if VIBEREPS_EXERCISES:
-                url += f"&exercises={VIBEREPS_EXERCISES}"
-            open_small_window(url)
+                # Launch detached background process
+                script_path = os.path.abspath(__file__)
+                subprocess.Popen(
+                    [sys.executable, script_path, "--daemon"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True  # Detach from parent
+                )
 
-            return {"status": "success", "message": "Exercise tracker launched in background"}
+                # Give server a moment to start, then open browser from this process
+                time.sleep(0.5)
+                url = f"http://localhost:{self.port}?quick=true"
+                if VIBEREPS_EXERCISES:
+                    url += f"&exercises={VIBEREPS_EXERCISES}"
+                open_small_window(url)
+
+                return {"status": "success", "message": "Exercise tracker launched in background"}
+            finally:
+                # Clean up lock file
+                lock_file.unlink(missing_ok=True)
 
         elif event_type == "task_complete":
             # Normal mode - wait for user to complete exercises
