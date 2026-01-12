@@ -748,9 +748,10 @@ const selector = document.getElementById('exerciseSelector');
             }
             avgY /= primaryIds.length;
 
-            // Reset baseline when in down position or starting (improved calf raise detection)
-            if (exerciseState === 'ready' || exerciseState === 'down') {
+            // Set baseline only on first frame (ready state)
+            if (exerciseState === 'ready') {
                 detectionState.baseline = avgY;
+                exerciseState = 'down';
             }
 
             // For calf raises, we need to factor in leg length
@@ -770,8 +771,6 @@ const selector = document.getElementById('exerciseSelector');
             const lift = detectionState.baseline - avgY;
             const statusEl = document.getElementById('status');
 
-            if (exerciseState === 'ready') exerciseState = 'down';
-
             if (exerciseState === 'down') {
                 statusEl.textContent = config.instructions?.ready || `Lift: ${(lift * 100).toFixed(1)}%`;
             }
@@ -780,6 +779,8 @@ const selector = document.getElementById('exerciseSelector');
                 exerciseState = 'up';
                 statusEl.textContent = config.instructions?.up || 'Hold! Now lower down';
             } else if (lift < threshold * 0.3 && exerciseState === 'up') {
+                // Reset baseline when coming back down for next rep
+                detectionState.baseline = avgY;
                 exerciseState = 'down';
                 repCount++;
                 updateCounter();
@@ -1516,21 +1517,70 @@ const selector = document.getElementById('exerciseSelector');
                 status.className = 'cam-status';
 
             } catch (err) {
-                console.error('Camera enumeration failed:', err);
                 select.innerHTML = '<option value="">permission denied</option>';
                 status.textContent = '✗';
                 status.className = 'cam-status error';
             }
         }
 
-        document.getElementById('cameraSelect').addEventListener('change', (e) => {
+        async function switchCamera(deviceId) {
+            const video = document.getElementById('video');
+            const status = document.getElementById('camStatus');
+
+            // Stop existing stream if any
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            if (camera) {
+                camera.stop();
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: 320,
+                        height: 240,
+                        deviceId: { exact: deviceId }
+                    }
+                });
+                video.srcObject = stream;
+
+                // Restart MediaPipe camera if pose is active
+                if (pose && typeof Camera !== 'undefined') {
+                    camera = new Camera(video, {
+                        onFrame: async () => { await pose.send({image: video}); },
+                        width: 320,
+                        height: 240
+                    });
+                    await camera.start();
+                }
+
+                status.textContent = '✓ switched';
+                status.className = 'cam-status';
+
+            } catch (err) {
+                status.textContent = '✗ failed';
+                status.className = 'cam-status error';
+            }
+        }
+
+        document.getElementById('cameraSelect').addEventListener('change', async (e) => {
             selectedCameraId = e.target.value;
             localStorage.setItem('vibereps-camera', selectedCameraId);
-            document.getElementById('camStatus').textContent = '✓ saved';
+
+            // If video is currently active, switch immediately
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                await switchCamera(selectedCameraId);
+            } else {
+                document.getElementById('camStatus').textContent = '✓ saved';
+            }
+
+            // Reset status after a moment
             setTimeout(() => {
                 const cameras = document.getElementById('cameraSelect').options.length;
                 document.getElementById('camStatus').textContent = `✓ ${cameras}`;
-            }, 1000);
+            }, 2000);
         });
 
         // ============================================

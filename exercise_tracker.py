@@ -72,10 +72,42 @@ PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")  # Prome
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 
 
+def is_vibereps_window_open():
+    """Check if a vibereps Chrome window is already open."""
+    import platform
+    system = platform.system()
+
+    if system == "Darwin":  # macOS
+        try:
+            # Check if Chrome process exists with vibereps user data dir
+            result = subprocess.run(
+                ["pgrep", "-f", "vibereps-chrome"],
+                capture_output=True, timeout=2
+            )
+            return result.returncode == 0
+        except Exception:
+            pass
+    elif system == "Linux":
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "vibereps-chrome"],
+                capture_output=True, timeout=2
+            )
+            return result.returncode == 0
+        except Exception:
+            pass
+
+    return False
+
+
 def open_small_window(url: str, width: int = 340, height: int = 520):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
+
+    # Check if window already exists
+    if is_vibereps_window_open():
+        return  # Don't open duplicate window
 
     system = platform.system()
 
@@ -430,37 +462,36 @@ class ExerciseTrackerHook:
                 except (FileExistsError, OSError):
                     return {"status": "skipped", "message": "Exercise tracker launch in progress"}
 
+            # Check if server is already running
             try:
-                # Check if server is already running
-                try:
-                    urllib.request.urlopen("http://localhost:8765/status", timeout=1)
-                    # Server already running, skip
-                    return {"status": "skipped", "message": "Exercise tracker already running"}
-                except BaseException:
-                    # Server not running, launch it
-                    pass
-
-                # Launch detached background process
-                script_path = os.path.abspath(__file__)
-                subprocess.Popen(
-                    [sys.executable, script_path, "--daemon"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    start_new_session=True  # Detach from parent
-                )
-
-                # Give server a moment to start, then open browser from this process
-                time.sleep(0.5)
-                url = f"http://localhost:{self.port}?quick=true"
-                if VIBEREPS_EXERCISES:
-                    url += f"&exercises={VIBEREPS_EXERCISES}"
-                open_small_window(url)
-
-                return {"status": "success", "message": "Exercise tracker launched in background"}
-            finally:
-                # Clean up lock file
+                urllib.request.urlopen("http://localhost:8765/status", timeout=1)
+                # Server already running, skip (but keep lock for a moment)
                 lock_file.unlink(missing_ok=True)
+                return {"status": "skipped", "message": "Exercise tracker already running"}
+            except BaseException:
+                # Server not running, launch it
+                pass
+
+            # Launch detached background process
+            script_path = os.path.abspath(__file__)
+            subprocess.Popen(
+                [sys.executable, script_path, "--daemon"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True  # Detach from parent
+            )
+
+            # Give server a moment to start, then open browser from this process
+            time.sleep(0.5)
+            url = f"http://localhost:{self.port}?quick=true"
+            if VIBEREPS_EXERCISES:
+                url += f"&exercises={VIBEREPS_EXERCISES}"
+            open_small_window(url)
+
+            # Don't delete lock - let it stay for 10s stale window
+            # This prevents duplicate windows if hooks fire in quick succession
+            return {"status": "success", "message": "Exercise tracker launched in background"}
 
         elif event_type == "task_complete":
             # Normal mode - wait for user to complete exercises
