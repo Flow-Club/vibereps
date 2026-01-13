@@ -371,6 +371,7 @@
         let exerciseState = null;
         let pose = null;
         let camera = null;
+        let frameLoopId = null;  // For manual frame loop when camera switching
         let startTime = null;
         let statusPollInterval = null;
         let isQuickMode = new URLSearchParams(window.location.search).get('quick') === 'true';
@@ -1368,6 +1369,10 @@ const selector = document.getElementById('exerciseSelector');
                 document.getElementById('status').textContent = '🎉 Great job! Exercise complete!';
 
                 if (camera) camera.stop();
+                if (frameLoopId) {
+                    cancelAnimationFrame(frameLoopId);
+                    frameLoopId = null;
+                }
                 const video = document.getElementById('video');
                 if (video.srcObject) {
                     video.srcObject.getTracks().forEach(track => track.stop());
@@ -1531,8 +1536,15 @@ const selector = document.getElementById('exerciseSelector');
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
+            // Stop MediaPipe camera (it would override our stream)
             if (camera) {
                 camera.stop();
+                camera = null;
+            }
+            // Cancel any existing manual frame loop
+            if (frameLoopId) {
+                cancelAnimationFrame(frameLoopId);
+                frameLoopId = null;
             }
 
             try {
@@ -1545,14 +1557,16 @@ const selector = document.getElementById('exerciseSelector');
                 });
                 video.srcObject = stream;
 
-                // Restart MediaPipe camera if pose is active
-                if (pose && typeof Camera !== 'undefined') {
-                    camera = new Camera(video, {
-                        onFrame: async () => { await pose.send({image: video}); },
-                        width: 320,
-                        height: 240
-                    });
-                    await camera.start();
+                // Use manual frame loop instead of MediaPipe Camera class
+                // (Camera class calls getUserMedia internally and ignores our deviceId)
+                if (pose) {
+                    const sendFrame = async () => {
+                        if (video.readyState >= 2) {
+                            await pose.send({image: video});
+                        }
+                        frameLoopId = requestAnimationFrame(sendFrame);
+                    };
+                    frameLoopId = requestAnimationFrame(sendFrame);
                 }
 
                 status.textContent = '✓ switched';
