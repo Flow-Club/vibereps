@@ -52,6 +52,12 @@ Event types:
   user_prompt_submit Quick mode (5 reps while Claude works)
   task_complete     Normal mode (10 reps after Claude finishes)
 
+Detection Engines:
+  Run ./configure.py to select detection engine:
+    mediapipe   - Best accuracy, 33 landmarks (default)
+    tensorflow  - TensorFlow.js MoveNet, fast & accurate
+    simple      - Basic detection, fastest, minimal resources
+
 Environment variables:
   VIBEREPS_EXERCISES   Comma-separated list of exercises to use
   VIBEREPS_DISABLED    Set to 1 to disable tracking
@@ -250,6 +256,15 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 "exercise_complete": ExerciseHTTPHandler.exercise_complete
             }
             self.wfile.write(json.dumps(status).encode())
+        elif parsed_path == '/config':
+            # Serve detection engine configuration
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            config = self.get_config()
+            self.wfile.write(json.dumps(config).encode())
         elif parsed_path == '/exercises':
             # List all exercise definitions
             self.send_response(200)
@@ -330,6 +345,44 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             return html_path.read_text()
         except FileNotFoundError:
             return "<html><body><h1>Error: exercise_ui.html not found</h1></body></html>"
+
+    def get_config(self):
+        """Load detection engine configuration from config.json"""
+        config_path = Path(__file__).parent / "config.json"
+
+        # Default config if file doesn't exist
+        default_config = {
+            "detection_engine": "mediapipe",
+            "detection_engines": {
+                "mediapipe": {
+                    "name": "MediaPipe",
+                    "description": "Google's MediaPipe Pose - Best accuracy",
+                    "model_complexity": 1,
+                    "smooth_landmarks": True,
+                    "min_detection_confidence": 0.5,
+                    "min_tracking_confidence": 0.5
+                },
+                "tensorflow": {
+                    "name": "TensorFlow.js MoveNet",
+                    "description": "TensorFlow.js MoveNet - Fast, good accuracy",
+                    "model_type": "lightning",
+                    "score_threshold": 0.3
+                },
+                "simple": {
+                    "name": "Simple Landmarks",
+                    "description": "Basic landmark detection - Fastest, lower accuracy",
+                    "smoothing": True,
+                    "confidence_threshold": 0.4
+                }
+            }
+        }
+
+        try:
+            if config_path.exists():
+                return json.loads(config_path.read_text())
+            return default_config
+        except (json.JSONDecodeError, IOError):
+            return default_config
 
     def get_exercise_list(self):
         """Get list of all exercise definitions from exercises directory"""

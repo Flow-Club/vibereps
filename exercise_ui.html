@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Claude Code Exercise Break</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+    <!-- Detection engine scripts loaded dynamically based on config -->
+    <script id="detection-engine-mediapipe-pose"></script>
+    <script id="detection-engine-mediapipe-camera"></script>
+    <script id="detection-engine-tensorflow"></script>
     <style>
         :root, [data-theme="vscode"] {
             --bg: #1e1e1e;
@@ -379,6 +381,476 @@
         // Detection state (baselines, history)
         let detectionState = {};
 
+        // Detection engine configuration
+        let detectionEngine = 'mediapipe';  // Default
+        let engineConfig = {};
+        let engineReady = false;
+
+        // ============================================
+        // Detection Engine Abstraction Layer
+        // ============================================
+        const DetectionEngines = {
+            // MediaPipe engine (default - best accuracy)
+            mediapipe: {
+                name: 'MediaPipe',
+                pose: null,
+                camera: null,
+                loaded: false,
+
+                async load() {
+                    // Load scripts dynamically
+                    const poseScript = document.getElementById('detection-engine-mediapipe-pose');
+                    const cameraScript = document.getElementById('detection-engine-mediapipe-camera');
+
+                    poseScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js';
+                    cameraScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js';
+
+                    // Wait for scripts to load
+                    await Promise.all([
+                        new Promise(resolve => { poseScript.onload = resolve; }),
+                        new Promise(resolve => { cameraScript.onload = resolve; })
+                    ]);
+
+                    this.loaded = true;
+                    return true;
+                },
+
+                async init(onResults) {
+                    if (!this.loaded) await this.load();
+
+                    if (typeof Pose === 'undefined') {
+                        throw new Error('MediaPipe Pose library not loaded');
+                    }
+
+                    const config = engineConfig.mediapipe || {};
+                    this.pose = new Pose({
+                        locateFile: (file) => {
+                            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                        }
+                    });
+
+                    this.pose.setOptions({
+                        modelComplexity: config.model_complexity || 1,
+                        smoothLandmarks: config.smooth_landmarks !== false,
+                        minDetectionConfidence: config.min_detection_confidence || 0.5,
+                        minTrackingConfidence: config.min_tracking_confidence || 0.5
+                    });
+
+                    this.pose.onResults((results) => {
+                        if (results.poseLandmarks) {
+                            // MediaPipe returns 33 landmarks
+                            onResults(this.normalizeLandmarks(results.poseLandmarks));
+                        }
+                    });
+
+                    return true;
+                },
+
+                async start(video) {
+                    if (typeof Camera !== 'undefined') {
+                        this.camera = new Camera(video, {
+                            onFrame: async () => { await this.pose.send({image: video}); },
+                            width: 320,
+                            height: 240
+                        });
+                        await this.camera.start();
+                    }
+                },
+
+                stop() {
+                    if (this.camera) this.camera.stop();
+                },
+
+                normalizeLandmarks(landmarks) {
+                    // MediaPipe landmarks are already in normalized format (0-1)
+                    return landmarks;
+                }
+            },
+
+            // TensorFlow.js MoveNet engine (fast, good accuracy)
+            tensorflow: {
+                name: 'TensorFlow MoveNet',
+                detector: null,
+                animationFrame: null,
+                loaded: false,
+                onResultsCallback: null,
+
+                async load() {
+                    const tfScript = document.getElementById('detection-engine-tensorflow');
+
+                    // Load TensorFlow.js and pose-detection
+                    const scripts = [
+                        'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core',
+                        'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter',
+                        'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl',
+                        'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection'
+                    ];
+
+                    for (const src of scripts) {
+                        await new Promise((resolve, reject) => {
+                            const script = document.createElement('script');
+                            script.src = src;
+                            script.onload = resolve;
+                            script.onerror = reject;
+                            document.head.appendChild(script);
+                        });
+                    }
+
+                    this.loaded = true;
+                    return true;
+                },
+
+                async init(onResults) {
+                    if (!this.loaded) await this.load();
+
+                    if (typeof poseDetection === 'undefined') {
+                        throw new Error('TensorFlow pose-detection library not loaded');
+                    }
+
+                    const config = engineConfig.tensorflow || {};
+                    const modelType = config.model_type === 'thunder'
+                        ? poseDetection.movenet.modelType.SINGLEPOSE_THUNDER
+                        : poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING;
+
+                    this.detector = await poseDetection.createDetector(
+                        poseDetection.SupportedModels.MoveNet,
+                        { modelType }
+                    );
+
+                    this.onResultsCallback = onResults;
+                    return true;
+                },
+
+                async start(video) {
+                    const detect = async () => {
+                        if (!this.detector) return;
+
+                        try {
+                            const poses = await this.detector.estimatePoses(video);
+                            if (poses.length > 0 && poses[0].keypoints) {
+                                const landmarks = this.normalizeLandmarks(poses[0].keypoints, video);
+                                this.onResultsCallback(landmarks);
+                            }
+                        } catch (e) {
+                            console.error('Detection error:', e);
+                        }
+
+                        this.animationFrame = requestAnimationFrame(detect);
+                    };
+
+                    detect();
+                },
+
+                stop() {
+                    if (this.animationFrame) {
+                        cancelAnimationFrame(this.animationFrame);
+                    }
+                },
+
+                normalizeLandmarks(keypoints, video) {
+                    // MoveNet has 17 keypoints, we need to map to 33 MediaPipe-style landmarks
+                    // MoveNet keypoints: nose, left_eye, right_eye, left_ear, right_ear,
+                    // left_shoulder, right_shoulder, left_elbow, right_elbow,
+                    // left_wrist, right_wrist, left_hip, right_hip,
+                    // left_knee, right_knee, left_ankle, right_ankle
+
+                    const width = video.videoWidth || 320;
+                    const height = video.videoHeight || 240;
+                    const scoreThreshold = (engineConfig.tensorflow || {}).score_threshold || 0.3;
+
+                    // Map MoveNet to MediaPipe indices
+                    const mpLandmarks = new Array(33).fill(null);
+
+                    const mapping = {
+                        0: 0,   // nose
+                        1: 2,   // left_eye -> left_eye_inner (approx)
+                        2: 5,   // right_eye -> right_eye_inner (approx)
+                        3: 7,   // left_ear
+                        4: 8,   // right_ear
+                        5: 11,  // left_shoulder
+                        6: 12,  // right_shoulder
+                        7: 13,  // left_elbow
+                        8: 14,  // right_elbow
+                        9: 15,  // left_wrist
+                        10: 16, // right_wrist
+                        11: 23, // left_hip
+                        12: 24, // right_hip
+                        13: 25, // left_knee
+                        14: 26, // right_knee
+                        15: 27, // left_ankle
+                        16: 28  // right_ankle
+                    };
+
+                    keypoints.forEach((kp, idx) => {
+                        const mpIdx = mapping[idx];
+                        if (mpIdx !== undefined) {
+                            mpLandmarks[mpIdx] = {
+                                x: kp.x / width,
+                                y: kp.y / height,
+                                z: 0,
+                                visibility: kp.score >= scoreThreshold ? kp.score : 0
+                            };
+                        }
+                    });
+
+                    // Fill in missing landmarks with interpolated values
+                    // Left eye outer (3) from left eye
+                    if (mpLandmarks[2]) mpLandmarks[3] = {...mpLandmarks[2]};
+                    // Right eye outer (6) from right eye
+                    if (mpLandmarks[5]) mpLandmarks[6] = {...mpLandmarks[5]};
+                    // Mouth landmarks (9,10) from nose
+                    if (mpLandmarks[0]) {
+                        mpLandmarks[9] = {...mpLandmarks[0], y: mpLandmarks[0].y + 0.02};
+                        mpLandmarks[10] = {...mpLandmarks[0], y: mpLandmarks[0].y + 0.02};
+                    }
+                    // Pinky/index from wrist
+                    if (mpLandmarks[15]) {
+                        mpLandmarks[17] = {...mpLandmarks[15]};
+                        mpLandmarks[19] = {...mpLandmarks[15]};
+                        mpLandmarks[21] = {...mpLandmarks[15]};
+                    }
+                    if (mpLandmarks[16]) {
+                        mpLandmarks[18] = {...mpLandmarks[16]};
+                        mpLandmarks[20] = {...mpLandmarks[16]};
+                        mpLandmarks[22] = {...mpLandmarks[16]};
+                    }
+                    // Heel/toe from ankle
+                    if (mpLandmarks[27]) {
+                        mpLandmarks[29] = {...mpLandmarks[27]};
+                        mpLandmarks[31] = {...mpLandmarks[27]};
+                    }
+                    if (mpLandmarks[28]) {
+                        mpLandmarks[30] = {...mpLandmarks[28]};
+                        mpLandmarks[32] = {...mpLandmarks[28]};
+                    }
+
+                    return mpLandmarks;
+                }
+            },
+
+            // Simple landmarks engine (fastest, basic detection)
+            simple: {
+                name: 'Simple Landmarks',
+                animationFrame: null,
+                onResultsCallback: null,
+                lastLandmarks: null,
+                smoothingFactor: 0.7,
+
+                async load() {
+                    // No external dependencies needed
+                    return true;
+                },
+
+                async init(onResults) {
+                    this.onResultsCallback = onResults;
+                    const config = engineConfig.simple || {};
+                    this.smoothingFactor = config.smoothing ? 0.7 : 1.0;
+                    return true;
+                },
+
+                async start(video) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 64;  // Low res for speed
+                    canvas.height = 48;
+
+                    const detect = () => {
+                        if (!video.videoWidth) {
+                            this.animationFrame = requestAnimationFrame(detect);
+                            return;
+                        }
+
+                        // Draw low-res frame
+                        ctx.drawImage(video, 0, 0, 64, 48);
+                        const imageData = ctx.getImageData(0, 0, 64, 48);
+
+                        // Simple skin detection and blob analysis
+                        const landmarks = this.detectLandmarks(imageData, video);
+
+                        if (landmarks) {
+                            // Apply smoothing
+                            if (this.lastLandmarks && this.smoothingFactor < 1) {
+                                for (let i = 0; i < landmarks.length; i++) {
+                                    if (landmarks[i] && this.lastLandmarks[i]) {
+                                        landmarks[i].x = landmarks[i].x * (1 - this.smoothingFactor) +
+                                                        this.lastLandmarks[i].x * this.smoothingFactor;
+                                        landmarks[i].y = landmarks[i].y * (1 - this.smoothingFactor) +
+                                                        this.lastLandmarks[i].y * this.smoothingFactor;
+                                    }
+                                }
+                            }
+                            this.lastLandmarks = landmarks;
+                            this.onResultsCallback(landmarks);
+                        }
+
+                        this.animationFrame = requestAnimationFrame(detect);
+                    };
+
+                    detect();
+                },
+
+                stop() {
+                    if (this.animationFrame) {
+                        cancelAnimationFrame(this.animationFrame);
+                    }
+                },
+
+                detectLandmarks(imageData, video) {
+                    // Simple motion/position based landmark estimation
+                    // This is a basic implementation - real simple detection would use
+                    // more sophisticated algorithms but with minimal dependencies
+
+                    const width = video.videoWidth || 320;
+                    const height = video.videoHeight || 240;
+                    const data = imageData.data;
+                    const imgW = imageData.width;
+                    const imgH = imageData.height;
+
+                    // Find skin-colored regions (simplified)
+                    let skinPixels = [];
+                    for (let y = 0; y < imgH; y++) {
+                        for (let x = 0; x < imgW; x++) {
+                            const i = (y * imgW + x) * 4;
+                            const r = data[i], g = data[i+1], b = data[i+2];
+
+                            // Simple skin detection heuristic
+                            if (r > 80 && g > 40 && b > 20 &&
+                                r > g && r > b &&
+                                Math.abs(r - g) > 15) {
+                                skinPixels.push({x: x / imgW, y: y / imgH});
+                            }
+                        }
+                    }
+
+                    if (skinPixels.length < 10) {
+                        // Not enough data, return estimated pose
+                        return this.getDefaultPose();
+                    }
+
+                    // Find bounding box of skin
+                    let minX = 1, maxX = 0, minY = 1, maxY = 0;
+                    skinPixels.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        maxX = Math.max(maxX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxY = Math.max(maxY, p.y);
+                    });
+
+                    // Estimate body landmarks from bounding box
+                    return this.estimatePoseFromBounds(minX, maxX, minY, maxY);
+                },
+
+                getDefaultPose() {
+                    // Return centered default pose
+                    const landmarks = new Array(33).fill(null);
+                    const defaultPose = {
+                        0: {x: 0.5, y: 0.15},  // nose
+                        11: {x: 0.4, y: 0.3},  // left shoulder
+                        12: {x: 0.6, y: 0.3},  // right shoulder
+                        13: {x: 0.35, y: 0.45}, // left elbow
+                        14: {x: 0.65, y: 0.45}, // right elbow
+                        15: {x: 0.3, y: 0.55},  // left wrist
+                        16: {x: 0.7, y: 0.55},  // right wrist
+                        23: {x: 0.45, y: 0.55}, // left hip
+                        24: {x: 0.55, y: 0.55}, // right hip
+                        25: {x: 0.45, y: 0.75}, // left knee
+                        26: {x: 0.55, y: 0.75}, // right knee
+                        27: {x: 0.45, y: 0.95}, // left ankle
+                        28: {x: 0.55, y: 0.95}  // right ankle
+                    };
+
+                    for (const [idx, pos] of Object.entries(defaultPose)) {
+                        landmarks[parseInt(idx)] = {
+                            x: pos.x, y: pos.y, z: 0, visibility: 0.3
+                        };
+                    }
+
+                    return landmarks;
+                },
+
+                estimatePoseFromBounds(minX, maxX, minY, maxY) {
+                    // Estimate body pose from detected skin bounding box
+                    const centerX = (minX + maxX) / 2;
+                    const bodyHeight = maxY - minY;
+                    const bodyWidth = maxX - minX;
+
+                    const landmarks = new Array(33).fill(null);
+
+                    // Estimate key landmarks
+                    const pose = {
+                        0: {x: centerX, y: minY + bodyHeight * 0.05},  // nose
+                        11: {x: centerX - bodyWidth * 0.25, y: minY + bodyHeight * 0.2},  // left shoulder
+                        12: {x: centerX + bodyWidth * 0.25, y: minY + bodyHeight * 0.2},  // right shoulder
+                        13: {x: centerX - bodyWidth * 0.35, y: minY + bodyHeight * 0.4},  // left elbow
+                        14: {x: centerX + bodyWidth * 0.35, y: minY + bodyHeight * 0.4},  // right elbow
+                        15: {x: centerX - bodyWidth * 0.4, y: minY + bodyHeight * 0.55},  // left wrist
+                        16: {x: centerX + bodyWidth * 0.4, y: minY + bodyHeight * 0.55},  // right wrist
+                        23: {x: centerX - bodyWidth * 0.15, y: minY + bodyHeight * 0.5},  // left hip
+                        24: {x: centerX + bodyWidth * 0.15, y: minY + bodyHeight * 0.5},  // right hip
+                        25: {x: centerX - bodyWidth * 0.15, y: minY + bodyHeight * 0.7},  // left knee
+                        26: {x: centerX + bodyWidth * 0.15, y: minY + bodyHeight * 0.7},  // right knee
+                        27: {x: centerX - bodyWidth * 0.15, y: minY + bodyHeight * 0.95}, // left ankle
+                        28: {x: centerX + bodyWidth * 0.15, y: minY + bodyHeight * 0.95}  // right ankle
+                    };
+
+                    for (const [idx, pos] of Object.entries(pose)) {
+                        landmarks[parseInt(idx)] = {
+                            x: Math.max(0, Math.min(1, pos.x)),
+                            y: Math.max(0, Math.min(1, pos.y)),
+                            z: 0,
+                            visibility: 0.6
+                        };
+                    }
+
+                    return landmarks;
+                }
+            }
+        };
+
+        // Current detection engine instance
+        let currentEngine = null;
+
+        async function loadDetectionEngine() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Loading detection engine...';
+
+            try {
+                // Fetch config from server
+                const response = await fetch('/config');
+                const config = await response.json();
+
+                detectionEngine = config.detection_engine || 'mediapipe';
+                engineConfig = config.detection_engines || {};
+
+                console.log(`Loading detection engine: ${detectionEngine}`);
+
+                currentEngine = DetectionEngines[detectionEngine];
+                if (!currentEngine) {
+                    console.warn(`Unknown engine ${detectionEngine}, falling back to mediapipe`);
+                    currentEngine = DetectionEngines.mediapipe;
+                    detectionEngine = 'mediapipe';
+                }
+
+                await currentEngine.load();
+                engineReady = true;
+                statusEl.textContent = `${currentEngine.name} loaded. Select an exercise!`;
+
+            } catch (error) {
+                console.warn('Failed to load config, using MediaPipe:', error);
+                // Fallback to MediaPipe
+                currentEngine = DetectionEngines.mediapipe;
+                detectionEngine = 'mediapipe';
+
+                try {
+                    await currentEngine.load();
+                    engineReady = true;
+                    statusEl.textContent = 'Select an exercise to begin!';
+                } catch (e) {
+                    statusEl.textContent = 'Error loading detection engine: ' + e.message;
+                }
+            }
+        }
+
         // ============================================
         // Load exercises from server
         // ============================================
@@ -500,16 +972,12 @@ const selector = document.getElementById('exerciseSelector');
                 if (!pose) {
                     const success = await initPose();
                     if (!success) return;
+                    pose = currentEngine;  // Use engine as pose reference
                 }
 
-                if (typeof Camera !== 'undefined') {
-                    camera = new Camera(video, {
-                        onFrame: async () => { await pose.send({image: video}); },
-                        width: 320,
-                        height: 240
-                    });
-                    await camera.start();
-                }
+                // Start the detection engine
+                await currentEngine.start(video);
+                camera = currentEngine;  // Use engine as camera reference
             } catch (error) {
                 document.getElementById('status').textContent = 'Error: ' + error.message;
                 document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = false);
@@ -559,51 +1027,45 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         // ============================================
-        // MediaPipe initialization
+        // Detection Engine Initialization (unified for all engines)
         // ============================================
         async function initPose() {
-            if (typeof Pose === 'undefined') {
-                document.getElementById('status').textContent = 'Error: MediaPipe libraries not loaded';
+            if (!currentEngine) {
+                document.getElementById('status').textContent = 'Error: Detection engine not loaded';
                 return false;
             }
 
-            pose = new Pose({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
-                }
-            });
-
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-
-            pose.onResults(onPoseResults);
-            return true;
+            try {
+                await currentEngine.init(onPoseResults);
+                return true;
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error initializing detection: ' + error.message;
+                return false;
+            }
         }
 
-        function onPoseResults(results) {
+        function onPoseResults(landmarks) {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (results.poseLandmarks) {
-                detectExercise(results.poseLandmarks);
+            if (landmarks) {
+                detectExercise(landmarks);
 
                 const accentColor = themeColors[currentTheme] || '#4ec9b0';
                 ctx.strokeStyle = accentColor;
                 ctx.lineWidth = 2;
                 ctx.shadowBlur = 8;
                 ctx.shadowColor = accentColor;
-                drawConnectors(ctx, results.poseLandmarks);
+                drawConnectors(ctx, landmarks);
 
                 ctx.fillStyle = accentColor;
-                results.poseLandmarks.forEach(landmark => {
-                    ctx.beginPath();
-                    ctx.arc(landmark.x * 320, landmark.y * 240, 3, 0, 2 * Math.PI);
-                    ctx.fill();
+                landmarks.forEach(landmark => {
+                    if (landmark) {
+                        ctx.beginPath();
+                        ctx.arc(landmark.x * 320, landmark.y * 240, 3, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
                 });
             }
         }
@@ -1586,8 +2048,10 @@ const selector = document.getElementById('exerciseSelector');
         // ============================================
         // Initialize on page load
         // ============================================
-        enumerateCameras();
-        loadExercises();
+        loadDetectionEngine().then(() => {
+            enumerateCameras();
+            loadExercises();
+        });
     </script>
 </body>
 </html>

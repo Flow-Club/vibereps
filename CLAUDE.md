@@ -17,7 +17,7 @@ This is an exercise tracking system for Claude Code that encourages movement bre
 - MCP HTTP transport for Claude Code to query stats, leaderboards, streaks
 - Multi-user support with API key authentication
 
-All pose detection uses MediaPipe via browser webcam to count reps (squats, push-ups, jumping jacks). Video never leaves your browser.
+Pose detection uses configurable engines (MediaPipe, TensorFlow.js, or simple) via browser webcam to count reps (squats, push-ups, jumping jacks). Video never leaves your browser.
 
 ## Architecture
 
@@ -60,6 +60,28 @@ Claude Code ────────MCP over HTTP────▶  /mcp endpoint
 - Provides tools: `log_exercise_session`, `get_stats`, `get_leaderboard`, `check_streak`, `get_progress_today`
 
 ## Key Implementation Details
+
+### Detection Engines
+
+The system supports three pose detection engines, configurable via `./configure.py`:
+
+| Engine | Accuracy | Speed | Dependencies | Use Case |
+|--------|----------|-------|--------------|----------|
+| **MediaPipe** | Best | Medium | CDN (requires internet) | Default, most accurate |
+| **TensorFlow** | Good | Fast | CDN (caches offline) | Low latency, works offline |
+| **Simple** | Basic | Fastest | None | Minimal resources, older devices |
+
+Configuration stored in `config.json`:
+```json
+{
+  "detection_engine": "mediapipe",
+  "detection_engines": {
+    "mediapipe": { "model_complexity": 1 },
+    "tensorflow": { "model_type": "lightning" },
+    "simple": { "smoothing": true }
+  }
+}
+```
 
 ### Exercise Detection Logic
 
@@ -198,6 +220,15 @@ Then Claude can use tools like `get_leaderboard`, `check_streak`, etc.
 
 ## Customization Points
 
+### Change Detection Engine
+
+Run the configuration script to switch between detection engines:
+```bash
+./configure.py                    # Interactive configuration
+./configure.py --engine mediapipe # Direct selection
+./configure.py --show             # View current config
+```
+
 ### Change Target Reps
 
 Edit `targetReps` (normal mode) or `quickModeReps` (quick mode) objects in `exercise_ui.html`:
@@ -222,7 +253,10 @@ Goals are stored per-user in the remote database. Default: 50 reps/day, 3 sessio
 
 - **Local Hook**: Python 3 standard library only (http.server, webbrowser, threading)
 - **Remote Server**: FastAPI, SQLAlchemy, uvicorn, mcp (see `server/requirements.txt`)
-- **Browser**: MediaPipe Pose and Camera Utils loaded from CDN (requires internet)
+- **Browser Detection Engines**:
+  - MediaPipe: Loaded from CDN (requires internet)
+  - TensorFlow.js: Loaded from CDN, caches for offline use
+  - Simple: No external dependencies
 
 ## Local Monitoring Stack
 

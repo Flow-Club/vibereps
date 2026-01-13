@@ -1,0 +1,25 @@
+{
+  "detection_engine": "mediapipe",
+  "detection_engines": {
+    "mediapipe": {
+      "name": "MediaPipe",
+      "description": "Google's MediaPipe Pose - Best accuracy, requires internet for CDN",
+      "model_complexity": 1,
+      "smooth_landmarks": true,
+      "min_detection_confidence": 0.5,
+      "min_tracking_confidence": 0.5
+    },
+    "tensorflow": {
+      "name": "TensorFlow.js MoveNet",
+      "description": "TensorFlow.js MoveNet - Fast, good accuracy, works offline after first load",
+      "model_type": "lightning",
+      "score_threshold": 0.3
+    },
+    "simple": {
+      "name": "Simple Landmarks",
+      "description": "Basic landmark detection - Fastest, lower accuracy, minimal resources",
+      "smoothing": true,
+      "confidence_threshold": 0.4
+    }
+  }
+}

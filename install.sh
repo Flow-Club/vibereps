@@ -51,8 +51,89 @@ setup_permissions() {
     print_step "Setting up permissions"
     chmod +x "$INSTALL_DIR/exercise_tracker.py"
     chmod +x "$INSTALL_DIR/notify_complete.py"
+    chmod +x "$INSTALL_DIR/configure.py"
     [[ -f "$INSTALL_DIR/track_project.py" ]] && chmod +x "$INSTALL_DIR/track_project.py"
     print_success "Scripts are executable"
+}
+
+# Configure detection engine
+configure_detection_engine() {
+    print_step "Configuring detection engine"
+    echo ""
+    echo -e "  ${YELLOW}Choose your pose detection engine:${NC}"
+    echo ""
+    echo "  1) MediaPipe     - Best accuracy, 33 body landmarks (default)"
+    echo "  2) TensorFlow    - Fast & accurate, works offline after first load"
+    echo "  3) Simple        - Fastest, basic detection, minimal resources"
+    echo ""
+
+    read -p "  Enter choice [1-3] (default: 1): " -n 1 -r ENGINE_CHOICE
+    echo ""
+
+    case "$ENGINE_CHOICE" in
+        2)
+            ENGINE="tensorflow"
+            ENGINE_NAME="TensorFlow.js MoveNet"
+            ;;
+        3)
+            ENGINE="simple"
+            ENGINE_NAME="Simple Landmarks"
+            ;;
+        *)
+            ENGINE="mediapipe"
+            ENGINE_NAME="MediaPipe"
+            ;;
+    esac
+
+    # Update config.json
+    python3 << PYTHON_SCRIPT
+import json
+from pathlib import Path
+
+config_path = Path("$INSTALL_DIR/config.json")
+
+# Load existing config or create default
+if config_path.exists():
+    try:
+        config = json.loads(config_path.read_text())
+    except json.JSONDecodeError:
+        config = {}
+else:
+    config = {}
+
+# Ensure default engine configs exist
+if "detection_engines" not in config:
+    config["detection_engines"] = {
+        "mediapipe": {
+            "name": "MediaPipe",
+            "description": "Google's MediaPipe Pose - Best accuracy",
+            "model_complexity": 1,
+            "smooth_landmarks": True,
+            "min_detection_confidence": 0.5,
+            "min_tracking_confidence": 0.5
+        },
+        "tensorflow": {
+            "name": "TensorFlow.js MoveNet",
+            "description": "TensorFlow.js MoveNet - Fast, good accuracy",
+            "model_type": "lightning",
+            "score_threshold": 0.3
+        },
+        "simple": {
+            "name": "Simple Landmarks",
+            "description": "Basic landmark detection - Fastest, lower accuracy",
+            "smoothing": True,
+            "confidence_threshold": 0.4
+        }
+    }
+
+# Set the selected engine
+config["detection_engine"] = "$ENGINE"
+
+# Write config
+config_path.write_text(json.dumps(config, indent=2))
+PYTHON_SCRIPT
+
+    print_success "Detection engine set to $ENGINE_NAME"
 }
 
 # Backup existing settings
@@ -185,6 +266,9 @@ show_summary() {
     echo -e "  ${YELLOW}Optional - Set exercises (add to ~/.bashrc or ~/.zshrc):${NC}"
     echo "    export VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches"
     echo ""
+    echo -e "  ${YELLOW}Change detection engine:${NC}"
+    echo "    $INSTALL_DIR/configure.py"
+    echo ""
     echo -e "  ${YELLOW}To uninstall:${NC}"
     echo "    $INSTALL_DIR/install.sh --uninstall"
     echo ""
@@ -288,6 +372,7 @@ echo ""
 
 install_vibereps
 setup_permissions
+configure_detection_engine
 backup_settings
 configure_hooks
 show_summary
