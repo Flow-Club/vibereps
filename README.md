@@ -1,6 +1,6 @@
 # Vibe Reps
 
-Work on your human Corpus while Opus generates.
+Don't neglect your physical corpus.
 
 Turn model generation time into movement.
 

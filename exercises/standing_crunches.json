@@ -18,7 +18,7 @@
       ]
     },
     "thresholds": {
-      "trigger": 0.3
+      "trigger": 0.4
     },
     "mode": "either",
     "states": ["ready", "up", "down"],

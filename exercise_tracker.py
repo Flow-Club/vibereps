@@ -400,14 +400,25 @@ class ExerciseTrackerHook:
         url = self.start_web_server(quick_mode=quick_mode)
 
         # Browser is opened by parent process, not here
-        # Keep server running until user closes browser or timeout
+        # Keep server running until completion, browser closes, or timeout
 
-        # Wait for either completion or timeout (10 minutes max)
+        # Shorter timeout for quick mode (2 min vs 10 min for normal)
+        timeout = 120 if quick_mode else 600
         start_time = time.time()
-        while time.time() - start_time < 600:
+
+        while time.time() - start_time < timeout:
             if ExerciseHTTPHandler.exercise_complete:
                 print("✅ Session complete!")
                 break
+
+            # Check if browser window was closed (Chrome process gone)
+            if not is_vibereps_window_open():
+                # Give a small grace period in case browser is just slow
+                time.sleep(2)
+                if not is_vibereps_window_open():
+                    print("🚪 Browser window closed")
+                    break
+
             time.sleep(1)
 
         # Shutdown server

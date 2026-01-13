@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitepress'
+import config from '../../config.json'
 
 export default defineConfig({
-  title: 'VibeReps',
-  description: 'Work on your human Corpus while Opus generates. Exercise tracking for Claude Code.',
+  title: config.name,
+  description: `${config.tagline} ${config.description}`,
 
   base: '/vibereps/',
 

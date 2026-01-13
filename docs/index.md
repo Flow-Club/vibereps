@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: VibeReps
-  text: Work on your human Corpus while Opus generates
+  text: Don't neglect your physical corpus
   tagline: Turn model generation time into movement.
   actions:
     - theme: brand
