@@ -1,8 +1,8 @@
 # Vibe Reps
 
-Get jacked before AI takes your job.
+Work on your human Corpus while Opus generates.
 
-Push shift-tab, push up, push code.
+Turn model generation time into movement.
 
 ---
 

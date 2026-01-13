@@ -282,7 +282,7 @@ esac
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║${NC}                    ${BLUE}VibeReps Installer${NC}                      ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}          Get jacked before AI takes your job!              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}    Work on your human Corpus while Opus generates!         ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

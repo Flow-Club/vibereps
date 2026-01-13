@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: VibeReps
-  text: Get jacked before AI takes your job
-  tagline: Push shift-tab, push up, push code.
+  text: Work on your human Corpus while Opus generates
+  tagline: Turn model generation time into movement.
   actions:
     - theme: brand
       text: Get Started

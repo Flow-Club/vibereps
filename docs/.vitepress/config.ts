@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'VibeReps',
-  description: 'Get jacked before AI takes your job. Exercise tracking for Claude Code.',
+  description: 'Work on your human Corpus while Opus generates. Exercise tracking for Claude Code.',
 
   base: '/vibereps/',
 
