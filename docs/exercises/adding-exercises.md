@@ -8,25 +8,35 @@ Create a new file like `exercises/my_exercise.json`:
 
 ```json
 {
-  "name": "My Exercise",
   "id": "my_exercise",
+  "name": "My Exercise",
   "description": "Description shown to user",
+  "category": "strength",
+
+  "reps": {
+    "normal": 10,
+    "quick": 5
+  },
+
   "detection": {
     "type": "angle",
-    "joints": ["shoulder", "elbow", "wrist"],
+    "landmarks": {
+      "joint": [11, 13, 15],
+      "joint_alt": [12, 14, 16],
+      "_names": ["left_shoulder/elbow/wrist", "right_shoulder/elbow/wrist"]
+    },
     "thresholds": {
       "down": 90,
       "up": 150
-    }
+    },
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
   },
+
   "instructions": {
     "ready": "Get ready...",
     "down": "Go down!",
     "up": "Come back up!"
-  },
-  "targetReps": {
-    "normal": 10,
-    "quick": 5
   }
 }
 ```
@@ -35,53 +45,106 @@ Create a new file like `exercises/my_exercise.json`:
 
 ### `angle`
 
-Measures the angle between three joints:
+Measures the angle between three landmark points (joint indices):
 
 ```json
 {
   "type": "angle",
-  "joints": ["hip", "knee", "ankle"],
+  "landmarks": {
+    "joint": [23, 25, 27],
+    "joint_alt": [24, 26, 28],
+    "_names": ["left_hip/knee/ankle", "right_hip/knee/ankle"]
+  },
   "thresholds": {
-    "down": 100,
-    "up": 160
-  }
+    "down": 120,
+    "up": 150
+  },
+  "states": ["ready", "up", "down"],
+  "countOn": "up"
 }
 ```
 
-The angle is calculated at the middle joint (knee in this example).
+The angle is calculated at the middle landmark (index 25/26 = knee in this example).
 
-### `position`
+### `position_relative`
 
-Tracks Y-coordinate of a landmark relative to another:
+Tracks Y-coordinate of landmarks relative to reference landmarks:
 
 ```json
 {
-  "type": "position",
-  "landmark": "wrist",
-  "reference": "shoulder",
-  "thresholds": {
-    "trigger": -0.1,
-    "reset": 0.05
-  }
+  "type": "position_relative",
+  "landmarks": {
+    "target": [15, 16],
+    "reference": [11, 12],
+    "_names": ["wrists", "shoulders"]
+  },
+  "condition": "above",
+  "states": ["ready", "up", "down"],
+  "countOn": "up"
 }
 ```
 
-Negative values mean the landmark is above the reference.
+### `distance`
 
-### `movement`
-
-Tracks movement patterns like twists or circles:
+Measures distance between landmark pairs (e.g., elbow to opposite knee):
 
 ```json
 {
-  "type": "movement",
-  "pattern": "twist",
-  "landmarks": ["left_shoulder", "right_shoulder"],
-  "reference": ["left_hip", "right_hip"],
+  "type": "distance",
+  "landmarks": {
+    "pairs": [
+      {"from": 13, "to": 26, "_names": ["left_elbow", "right_knee"]},
+      {"from": 14, "to": 25, "_names": ["right_elbow", "left_knee"]}
+    ]
+  },
   "thresholds": {
-    "trigger": 0.15,
-    "reset": 0.05
-  }
+    "trigger": 0.3
+  },
+  "mode": "either",
+  "states": ["ready", "up", "down"],
+  "countOn": "up"
+}
+```
+
+### `height_relative`
+
+Tracks vertical position of one landmark relative to another:
+
+```json
+{
+  "type": "height_relative",
+  "landmarks": {
+    "target": [29, 30],
+    "reference": [31, 32],
+    "_names": ["heels", "toes"]
+  },
+  "thresholds": {
+    "trigger": 0.015
+  },
+  "states": ["ready", "up", "down"],
+  "countOn": "up"
+}
+```
+
+### `position_baseline`
+
+Tracks movement from a baseline position (captured at start):
+
+```json
+{
+  "type": "position_baseline",
+  "landmarks": {
+    "target": [0],
+    "reference": [11, 12],
+    "_names": ["nose", "shoulders"]
+  },
+  "axis": "x",
+  "thresholds": {
+    "trigger": 0.02,
+    "release": 0.006
+  },
+  "states": ["ready", "forward", "tucked"],
+  "countOn": "forward"
 }
 ```
 

@@ -110,15 +110,17 @@ For position-based exercises, the "reset" threshold is typically 30-40% of the t
 
 | Exercise | Detection Method | Down Threshold | Up Threshold |
 |----------|-----------------|----------------|--------------|
-| Squats | Knee angle | < 100° | > 160° |
+| Squats | Knee angle | < 120° | > 150° |
 | Push-ups | Elbow angle | < 90° | > 150° |
 | Jumping Jacks | Wrist Y vs shoulders | Below shoulders | Above shoulders |
 | High Knees | Knee Y vs hip | - | Knee above hip |
 | Calf Raises | Heel lift | Baseline | > threshold |
-| Crunches | Hip angle | Compressed | Extended |
-| Side Bends | Shoulder tilt | Center | > threshold |
-| Russian Twists | Shoulder twist | Center | > threshold |
+| Standing Crunches | Elbow-knee distance | < 0.3 (normalized) | > threshold |
+| Side Stretches | Shoulder tilt | Center | > threshold |
+| Torso Twists | Shoulder twist | Center | > threshold |
 | Arm Circles | Wrist angle | Quadrant tracking | Full circle |
+| Shoulder Shrugs | Shoulder elevation | Baseline | > threshold |
+| Chin Tucks | Head position | Baseline | > 0.02 (x-axis) |
 
 #### Adding New Exercises
 
@@ -275,10 +277,15 @@ Then Claude can use tools like `get_leaderboard`, `check_streak`, etc.
 
 ### Change Target Reps
 
-Edit `targetReps` (normal mode) or `quickModeReps` (quick mode) objects in `exercise_ui.html`:
-```javascript
-let targetReps = {squats: 10, pushups: 10, jumping_jacks: 20};
-let quickModeReps = {squats: 5, pushups: 5, jumping_jacks: 10};
+Edit the JSON config files in `exercises/` directory. Each exercise has its own file:
+```json
+// exercises/squats.json
+{
+  "reps": {
+    "normal": 10,  // task_complete mode
+    "quick": 5     // post_tool_use mode
+  }
+}
 ```
 
 ### Change Detection Sensitivity

@@ -23,6 +23,7 @@ Available exercises:
 - `torso_twists` - Shoulder twist tracking
 - `arm_circles` - Wrist position tracking
 - `shoulder_shrugs` - Shoulder elevation tracking
+- `chin_tucks` - Head position tracking (posture correction)
 
 ### Remote Server (Optional)
 
@@ -43,29 +44,19 @@ export PUSHGATEWAY_URL=http://localhost:9091
 
 ## Customize Rep Targets
 
-Edit `~/.vibereps/exercise_ui.html` to change target reps:
+Edit the JSON config files in `~/.vibereps/exercises/` to change target reps:
 
-```javascript
-// Normal mode (task_complete)
-let targetReps = {
-  squats: 10,
-  pushups: 10,
-  jumping_jacks: 20,
-  standing_crunches: 10,
-  calf_raises: 15,
-  side_stretches: 10
-};
-
-// Quick mode (post_tool_use)
-let quickModeReps = {
-  squats: 5,
-  pushups: 5,
-  jumping_jacks: 10,
-  standing_crunches: 5,
-  calf_raises: 8,
-  side_stretches: 6
-};
+```json
+// Example: exercises/squats.json
+{
+  "reps": {
+    "normal": 10,  // task_complete mode
+    "quick": 5     // post_tool_use mode
+  }
+}
 ```
+
+Each exercise has its own JSON file with rep targets. See `exercises/` directory for all available configs.
 
 ## Change Server Port
 

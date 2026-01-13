@@ -6,16 +6,29 @@ Each exercise has thresholds that determine when a rep counts. Adjust these in `
 
 ### Angle-Based Exercises
 
-For squats, push-ups, and other angle-based exercises:
+For squats, push-ups, and other angle-based exercises, edit the JSON config files in `~/.vibereps/exercises/`:
 
-```javascript
-// Example: Make squats require deeper depth
-// Default: down < 100°, up > 160°
-if (angle < 80 && exerciseState !== 'down') {  // Deeper squat required
-  exerciseState = 'down';
-} else if (angle > 160 && exerciseState === 'down') {
-  exerciseState = 'up';
-  repCount++;
+```json
+// exercises/squats.json - adjust thresholds
+{
+  "detection": {
+    "thresholds": {
+      "down": 120,  // Default: 120° (lower = deeper squat required)
+      "up": 150     // Default: 150°
+    }
+  }
+}
+```
+
+Or for push-ups (`exercises/pushups.json`):
+```json
+{
+  "detection": {
+    "thresholds": {
+      "down": 90,   // Elbow angle for "down" position
+      "up": 150     // Elbow angle for "up" position
+    }
+  }
 }
 ```
 
@@ -41,22 +54,20 @@ ready → down → up (increment rep) → down → ...
 
 ### Hysteresis
 
-Separate thresholds prevent double-counting:
+Separate thresholds prevent double-counting. In the JSON config:
 
-```javascript
-// Different thresholds for down vs up transitions
-const DOWN_THRESHOLD = 100;  // Angle to enter "down" state
-const UP_THRESHOLD = 160;    // Angle to exit "down" state
-
-if (angle < DOWN_THRESHOLD && state !== 'down') {
-  state = 'down';
-} else if (angle > UP_THRESHOLD && state === 'down') {
-  state = 'up';
-  repCount++;
+```json
+{
+  "detection": {
+    "thresholds": {
+      "down": 120,  // Angle to enter "down" state
+      "up": 150     // Angle to exit "down" state
+    }
+  }
 }
 ```
 
-The gap between thresholds (100° to 160°) prevents noise from triggering false reps.
+The gap between thresholds (120° to 150°) prevents noise from triggering false reps. Increase the gap if you're getting double-counts.
 
 ## UI Customization
 
@@ -78,7 +89,7 @@ The UI is a single HTML file. Modify the structure as needed - it's self-contain
 
 ## Tips
 
-- **Too easy?** Lower the down threshold (e.g., 80° instead of 100° for squats)
-- **Too hard?** Raise the down threshold or lower rep counts
+- **Too easy?** Lower the down threshold (e.g., 100° instead of 120° for squats)
+- **Too hard?** Raise the down threshold or lower rep counts in the JSON config
 - **Double counting?** Increase the gap between down/up thresholds
 - **Not counting?** Ensure good lighting and full body visibility

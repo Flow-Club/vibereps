@@ -17,12 +17,16 @@ If exercises aren't counting correctly, you can tune the detection parameters.
 **Solutions**:
 1. Check camera can see your full body
 2. Improve lighting
-3. Adjust thresholds in `exercise_ui.html`:
+3. Adjust thresholds in the exercise JSON config (`~/.vibereps/exercises/squats.json`):
 
-```javascript
-// Make squats easier to detect
-if (angle < 120 && exerciseState !== 'down') {  // Was 100
-  exerciseState = 'down';
+```json
+{
+  "detection": {
+    "thresholds": {
+      "down": 130,  // Increase to make easier (default: 120)
+      "up": 145     // Decrease to make easier (default: 150)
+    }
+  }
 }
 ```
 
@@ -36,24 +40,20 @@ if (angle < 120 && exerciseState !== 'down') {  // Was 100
 - Jittery pose detection
 
 **Solutions**:
-1. Increase gap between down/up thresholds:
+1. Increase gap between down/up thresholds in the JSON config:
 
-```javascript
-const DOWN_ANGLE = 90;   // Enter "down" state
-const UP_ANGLE = 160;    // Exit "down" state (bigger gap = less jitter)
-```
-
-2. Add debouncing (minimum time between reps):
-
-```javascript
-const MIN_REP_INTERVAL = 500; // milliseconds
-let lastRepTime = 0;
-
-if (shouldCountRep && Date.now() - lastRepTime > MIN_REP_INTERVAL) {
-  repCount++;
-  lastRepTime = Date.now();
+```json
+{
+  "detection": {
+    "thresholds": {
+      "down": 110,  // Lower = stricter "down" detection
+      "up": 160     // Higher = stricter "up" detection (bigger gap = less jitter)
+    }
+  }
 }
 ```
+
+2. Move slower and more deliberately through the exercise motion.
 
 ### Wrong Exercise Detected
 
