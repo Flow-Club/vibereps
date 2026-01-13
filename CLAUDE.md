@@ -47,7 +47,7 @@ Claude Code ────────MCP over HTTP────▶  /mcp endpoint
 
 ### Notification System (`notify_complete.py`)
 
-- Triggered by `PostMessage` hook when Claude sends a message
+- Triggered by `Notification` hook when Claude finishes a task
 - Sends HTTP POST to `http://localhost:8765/notify` to signal completion
 - Exercise tracker UI polls `/status` endpoint to detect when Claude is ready
 - Shows desktop notification and updates UI when complete
@@ -63,27 +63,90 @@ Claude Code ────────MCP over HTTP────▶  /mcp endpoint
 
 ### Exercise Detection Logic
 
-Located in `exercise_ui.html`:
-- **Squats**: Hip-knee-ankle angle < 100° (down) → > 160° (up) = 1 rep
-- **Push-ups**: Shoulder-elbow-wrist angle < 90° (down) → > 150° (up) = 1 rep
-- **Jumping Jacks**: Arms above shoulders (up) → below (down) = 1 rep
-- State machine prevents double-counting with `exerciseState` tracking
+Located in `exercise_ui.html`. Rep counting uses MediaPipe pose landmarks with a state machine approach.
+
+#### Detection Methods
+
+**Angle-based exercises** (use `calculateAngle()` on joint landmarks):
+- **Squats**: Knee angle (hip-knee-ankle) - down < 100°, up > 160°
+- **Push-ups**: Elbow angle (shoulder-elbow-wrist) - down < 90°, up > 150°
+- **Crunches**: Hip angle (shoulder-hip-knee) compression detection
+
+**Position-based exercises** (use landmark Y coordinates):
+- **Jumping Jacks**: Wrist Y position relative to shoulders
+- **High Knees**: Knee Y position relative to hip
+- **Calf Raises**: Heel lift relative to baseline position
+
+**Movement-based exercises** (use relative landmark distances):
+- **Russian Twists**: Shoulder twist amount relative to hips
+- **Side Bends**: Shoulder tilt from center
+- **Arm Circles**: Wrist position tracking through quadrants
+
+#### State Machine
+
+Each exercise uses `exerciseState` variable with 2-3 states:
+
+```text
+ready → down → up (increment rep) → down → ...
+```
+
+#### Hysteresis Thresholds
+
+Separate thresholds for down vs up transitions prevent double-counting:
+
+```javascript
+// Example: Squats use different angles for each transition
+if (angle < DOWN_ANGLE && exerciseState !== 'down') {
+    exerciseState = 'down';
+} else if (angle > UP_ANGLE && exerciseState === 'down') {
+    exerciseState = 'up';
+    repCount++;
+}
+```
+
+For position-based exercises, the "reset" threshold is typically 30-40% of the trigger threshold.
+
+#### Supported Exercises
+
+| Exercise | Detection Method | Down Threshold | Up Threshold |
+|----------|-----------------|----------------|--------------|
+| Squats | Knee angle | < 100° | > 160° |
+| Push-ups | Elbow angle | < 90° | > 150° |
+| Jumping Jacks | Wrist Y vs shoulders | Below shoulders | Above shoulders |
+| High Knees | Knee Y vs hip | - | Knee above hip |
+| Calf Raises | Heel lift | Baseline | > threshold |
+| Crunches | Hip angle | Compressed | Extended |
+| Side Bends | Shoulder tilt | Center | > threshold |
+| Russian Twists | Shoulder twist | Center | > threshold |
+| Arm Circles | Wrist angle | Quadrant tracking | Full circle |
+
+#### Adding New Exercises
+
+Exercise configs are defined in `exercises/` JSON files. Each config specifies:
+- `detection.type`: `angle`, `position`, `movement`, etc.
+- `detection.joints`: Which landmarks to track
+- `detection.thresholds`: Down/up values for state transitions
+- `instructions`: User feedback messages for each state
 
 ### Data Flow
 
-**Quick Mode:**
+**PostToolUse Mode (recommended):**
 
-1. User submits prompt → `UserPromptSubmit` hook triggers
+1. Claude edits code → `PostToolUse` hook triggers (matcher: `Write|Edit`)
 2. `exercise_tracker.py` launches with `?quick=true` parameter
-3. User does 5 quick exercises while Claude works
-4. Exercise complete → Hook POSTs to remote server → UI polls `/status`
-5. Claude sends message → `PostMessage` hook triggers
+3. User does quick exercises while reviewing changes
+4. Exercise complete → Hook POSTs to remote server
+5. Claude finishes task → `Notification` hook triggers
 6. `notify_complete.py` POSTs to `/notify` endpoint
 7. UI detects completion, shows notification, user returns to Claude
 
 **Normal Mode:**
 
 Browser → POST `/complete` → Hook POSTs to remote → Exit
+
+**Legacy UserPromptSubmit Mode:**
+
+Triggers on every prompt submission (more frequent, may interrupt research tasks).
 
 **Claude Queries:**
 
@@ -155,26 +218,38 @@ export VIBEREPS_API_KEY=your_api_key_here
 
 ### 2. Hook Setup
 
-Exercise while Claude works! Add to `~/.claude/settings.json`:
+Exercise after code edits! Add to `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": [
+    "PostToolUse": [
       {
-        "type": "command",
-        "command": "/path/to/exercise_tracker.py user_prompt_submit '{}'"
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /path/to/exercise_tracker.py post_tool_use '{}'"
+          }
+        ]
       }
     ],
-    "PostMessage": [
+    "Notification": [
       {
-        "type": "command",
-        "command": "/path/to/notify_complete.py '{}'"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/notify_complete.py '{}'"
+          }
+        ]
       }
     ]
   }
 }
 ```
+
+The `VIBEREPS_EXERCISES` environment variable controls which exercises are available.
 
 ### 3. Claude Code MCP Setup (Remote)
 
@@ -284,3 +359,25 @@ Key environment variables:
 - Remote server uses API key authentication
 - Exercise data (reps, timestamps) stored on remote server for stats/leaderboards
 - Telemetry is opt-in and never includes sensitive data (API keys, file contents)
+
+## Known Limitations
+
+### Detection Accuracy
+
+The current implementation is functional but has room for improvement:
+
+- **No keypoint smoothing**: Raw MediaPipe landmarks are used directly without low-pass filtering (EMA), which can cause jitter on marginal poses
+- **No confidence gating**: Frames with low landmark confidence are not filtered out, potentially causing false counts
+- **No body-scale normalization**: Thresholds are absolute values rather than normalized by body proportions (e.g., shoulder width), so detection may vary with camera distance
+- **Main thread inference**: Pose detection runs on the main thread rather than a Web Worker, which can affect UI responsiveness on slower devices
+- **Camera angle sensitivity**: Detection is tuned for front-facing camera; side views may be less accurate
+
+### Potential Improvements
+
+If detection feels unreliable, consider:
+
+1. **Add EMA smoothing** to landmark positions before angle calculation
+2. **Gate on confidence** - skip frames where landmark visibility < 0.5
+3. **Normalize distances** by shoulder width or torso length
+4. **Move inference to Worker** with OffscreenCanvas for better performance
+5. **Add calibration step** to capture user's range of motion
