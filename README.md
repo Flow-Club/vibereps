@@ -124,6 +124,9 @@ Add to `~/.claude/settings.json`:
 export VIBEREPS_EXERCISES=squats,jumping_jacks   # Only squats and jumping jacks
 export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks,standing_crunches,calf_raises,side_stretches  # All exercises
 
+# --dangerously-skip-leg-day (filters out squats, calf raises, high knees, jumping jacks)
+export VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1
+
 # Remote VibeReps server (optional)
 export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key

@@ -53,10 +53,11 @@ Event types:
   task_complete     Normal mode (10 reps after Claude finishes)
 
 Environment variables:
-  VIBEREPS_EXERCISES   Comma-separated list of exercises to use
-  VIBEREPS_DISABLED    Set to 1 to disable tracking
-  VIBEREPS_API_URL     Remote server URL for logging
-  VIBEREPS_API_KEY     API key for remote server
+  VIBEREPS_EXERCISES     Comma-separated list of exercises to use
+  VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY  Set to 1 to --dangerously-skip-leg-day
+  VIBEREPS_DISABLED      Set to 1 to disable tracking
+  VIBEREPS_API_URL       Remote server URL for logging
+  VIBEREPS_API_KEY       API key for remote server
 """)
     sys.exit(0)
 
@@ -69,6 +70,20 @@ if os.getenv("VIBEREPS_DISABLED", ""):
 VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
 VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
+VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
+
+# Exercises that require legs (filtered out when VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1)
+LEG_EXERCISES = {"squats", "calf_raises", "high_knees", "jumping_jacks"}
+
+
+def get_filtered_exercises():
+    """Get exercise list, filtering out leg exercises if skip-leg-day is enabled."""
+    exercises = VIBEREPS_EXERCISES
+    if VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY and exercises:
+        exercise_list = [e.strip() for e in exercises.split(",")]
+        exercise_list = [e for e in exercise_list if e not in LEG_EXERCISES]
+        exercises = ",".join(exercise_list)
+    return exercises
 
 
 def is_vibereps_window_open():
@@ -473,8 +488,9 @@ class ExerciseTrackerHook:
             # Give server a moment to start, then open browser from this process
             time.sleep(0.5)
             url = f"http://localhost:{self.port}?quick=true"
-            if VIBEREPS_EXERCISES:
-                url += f"&exercises={VIBEREPS_EXERCISES}"
+            exercises = get_filtered_exercises()
+            if exercises:
+                url += f"&exercises={exercises}"
             open_small_window(url)
 
             # Don't delete lock - let it stay for 10s stale window
