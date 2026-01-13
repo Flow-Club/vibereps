@@ -33,7 +33,7 @@ docker-compose up -d
 
 ### 3. View Dashboard
 
-Open http://localhost:3000 (default: admin/admin)
+Open `http://localhost:3000` (default: admin/admin)
 
 A pre-configured dashboard is included.
 
