@@ -34,12 +34,12 @@ export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key
 ```
 
-### Prometheus Metrics (Optional)
+### Usage Tracking
 
-For local Grafana dashboard integration:
+Exercise data is automatically logged to `~/.vibereps/exercises.jsonl`. View combined Claude Code + exercise stats with:
 
 ```bash
-export PUSHGATEWAY_URL=http://localhost:9091
+./vibereps-usage.py
 ```
 
 ## Customize Rep Targets

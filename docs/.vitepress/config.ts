@@ -48,7 +48,7 @@ export default defineConfig({
         items: [
           { text: 'Architecture', link: '/advanced/architecture' },
           { text: 'Remote Server', link: '/advanced/server' },
-          { text: 'Monitoring', link: '/advanced/monitoring' }
+          { text: 'Usage Tracking', link: '/advanced/monitoring' }
         ]
       }
     ],

@@ -1,120 +1,62 @@
-# Monitoring
+# Usage Tracking
 
-The `monitoring/` directory contains a Docker Compose stack for visualizing Claude Code usage alongside exercise data.
-
-## Components
-
-| Component | Port | Purpose |
-|-----------|------|---------|
-| OTEL Collector | 4317 | Receives OpenTelemetry metrics |
-| Prometheus | 9090 | Time-series database |
-| Pushgateway | 9091 | Accepts custom metrics from hooks |
-| Grafana | 3000 | Dashboard visualization |
+View your Claude Code usage alongside exercise data with `vibereps-usage`.
 
 ## Quick Start
 
-### 1. Enable Claude Code Telemetry
+```bash
+# View combined usage and exercise data
+./vibereps-usage.py
 
-Add to your shell profile:
+# Or run from anywhere
+python ~/.vibereps/vibereps-usage.py
+```
+
+## Output
+
+```
+==================================================================================================================================
+Date         Models                              Input       Output          Total       Cost Exercises
+==================================================================================================================================
+2026-01-05   haiku-4-5, opus-4-5                21,091        2,937      3,033,566     $25.21 15 squats, 10 JJ
+2026-01-06   haiku-4-5, opus-4-5               113,396       10,142      5,548,007     $53.68 20 squats, 15 calf raises
+2026-01-07   haiku-4-5, opus-4-5                66,590        9,252      6,984,936     $66.70 25 squats
+==================================================================================================================================
+Total                                          201,077       22,331     15,566,509    $145.59 60 squats, 25 calf raises, 10 JJ
+```
+
+## How It Works
+
+1. Exercise data is logged to `~/.vibereps/exercises.jsonl` on each completion
+2. `vibereps-usage.py` reads this file and combines it with `ccusage` output
+3. Both data sources are grouped by date for a unified view
+
+## Options
 
 ```bash
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# Pass arguments through to ccusage
+./vibereps-usage.py --since 2026-01-01
+
+# Show only exercise data (no ccusage)
+./vibereps-usage.py --exercises-only
 ```
 
-### 2. Start the Stack
+## Data Files
 
-```bash
-cd monitoring
-docker-compose up -d
+| File | Description |
+|------|-------------|
+| `~/.vibereps/exercises.jsonl` | Local exercise log (one JSON object per line) |
+| `~/.claude/statsig/usage.jsonl` | Claude Code usage (read by ccusage) |
+
+## Exercise Log Format
+
+Each exercise completion is logged as:
+
+```json
+{"timestamp": "2026-01-13T10:30:00", "exercise": "squats", "reps": 5, "duration": 45, "mode": "quick"}
 ```
 
-### 3. View Dashboard
+## Requirements
 
-Open `http://localhost:3000` (default: admin/vibereps)
-
-A pre-configured dashboard is included.
-
-## Available Metrics
-
-### From Claude Code (via OTEL)
-
-| Metric | Description |
-|--------|-------------|
-| `claude_code_session_count` | CLI sessions started |
-| `claude_code_token_usage_tokens_total` | Tokens by type (input/output/cache) |
-| `claude_code_cost_usage_usd_total` | Cost by model |
-| `claude_code_lines_of_code_count_total` | Lines added/removed |
-| `claude_code_code_edit_tool_decision_total` | Edit accepts/rejects |
-| `claude_code_active_time_total_seconds_total` | CLI active time |
-
-### From Hooks (via Pushgateway)
-
-| Metric | Description |
-|--------|-------------|
-| `exercise_reps_total` | Exercise reps by type |
-| `exercise_sessions_total` | Exercise session count |
-| `claude_project_session_total` | Sessions by project/branch |
-
-## Enable Pushgateway
-
-Set the environment variable:
-
-```bash
-export PUSHGATEWAY_URL=http://localhost:9091
-```
-
-The exercise tracker will automatically push metrics on completion.
-
-## Custom Dashboards
-
-### Grafana Query Examples
-
-**Reps per day**:
-```promql
-sum(increase(exercise_reps_total[24h])) by (exercise)
-```
-
-**Cost per session**:
-```promql
-rate(claude_code_cost_usage_usd_total[1h])
-```
-
-**Token usage**:
-```promql
-sum(rate(claude_code_token_usage_tokens_total[5m])) by (type)
-```
-
-## OTEL Configuration
-
-Key environment variables:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLAUDE_CODE_ENABLE_TELEMETRY` | 0 | Must be 1 to enable |
-| `OTEL_METRIC_EXPORT_INTERVAL` | 60000 | Export interval (ms) |
-| `OTEL_RESOURCE_ATTRIBUTES` | - | Custom labels |
-
-### Add Custom Labels
-
-```bash
-export OTEL_RESOURCE_ATTRIBUTES="team=platform,env=dev"
-```
-
-## Troubleshooting
-
-**No metrics appearing?**
-1. Check telemetry is enabled: `echo $CLAUDE_CODE_ENABLE_TELEMETRY`
-2. Verify collector is running: `docker ps | grep otel`
-3. Check collector logs: `docker logs monitoring-otel-collector-1`
-
-**Pushgateway not receiving data?**
-1. Check URL is set: `echo $PUSHGATEWAY_URL`
-2. Test connectivity: `curl http://localhost:9091/metrics`
-3. Check exercise_tracker.py logs
-
-## Reference
-
-Full OTEL configuration options: https://code.claude.com/docs/en/monitoring-usage
+- [ccusage](https://github.com/ryoppippi/ccusage) - `npm install -g ccusage`
+- Python 3 (standard library only)

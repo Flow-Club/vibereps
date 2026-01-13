@@ -127,9 +127,6 @@ export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks,standing_crunches,calf_ra
 # Remote VibeReps server (optional)
 export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key
-
-# Local Prometheus Pushgateway (optional, for Grafana dashboard)
-export PUSHGATEWAY_URL=http://localhost:9091
 ```
 
 If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from the list and auto-start it (no manual selection needed).

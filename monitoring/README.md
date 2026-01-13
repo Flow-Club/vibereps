@@ -1,45 +1,24 @@
-# Local Monitoring Stack
+# Usage Tracking
 
-View Claude Code metrics locally with Prometheus + Grafana.
+**Note:** The Docker Compose stack (Prometheus/Grafana) in this directory is deprecated. Use `vibereps-usage.py` instead for a simpler approach.
 
-## Quick Start
+## Recommended: vibereps-usage
 
 ```bash
-# Start the monitoring stack
-docker-compose up -d
+# View combined Claude Code usage + exercise data
+./vibereps-usage.py
 
-# Configure Claude Code to export metrics
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# Or from anywhere
+python ~/.vibereps/vibereps-usage.py
 ```
 
-## Access
+See [docs/advanced/monitoring.md](../docs/advanced/monitoring.md) for details.
 
-- **Grafana**: http://localhost:3000 (admin / vibereps)
-- **Prometheus**: http://localhost:9090
+## Legacy Docker Stack
 
-## Available Metrics
-
-Claude Code exports these metrics (prefixed with `claude_code_`):
-
-- `session_count` - Number of sessions
-- `tokens_input` / `tokens_output` - Token usage
-- `tokens_cache_read` / `tokens_cache_write` - Cache usage
-- `lines_of_code_accepted` - Code accepted
-- `cost_usd` - Cost (API billing only)
-- `commits_count` / `pull_requests_count` - Git activity
-
-## Stop
+The Docker Compose files remain for reference but are no longer maintained. If you previously used this:
 
 ```bash
-docker-compose down
-```
-
-## Persist Data
-
-Data is stored in Docker volumes. To reset:
-
-```bash
+# Stop and remove
 docker-compose down -v
 ```

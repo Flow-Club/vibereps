@@ -306,57 +306,35 @@ Goals are stored per-user in the remote database. Default: 50 reps/day, 3 sessio
 - **Remote Server**: FastAPI, SQLAlchemy, uvicorn, mcp (see `server/requirements.txt`)
 - **Browser**: MediaPipe Pose and Camera Utils loaded from CDN (requires internet)
 
-## Local Monitoring Stack
+## Usage Tracking
 
-The `monitoring/` directory contains a Docker Compose stack for visualizing Claude Code usage metrics alongside exercise data.
+View Claude Code usage alongside exercise data with `vibereps-usage.py`.
 
-### Components
-
-- **OTEL Collector** - Receives OpenTelemetry metrics from Claude Code
-- **Prometheus** - Time-series database for metrics storage
-- **Pushgateway** - Accepts custom metrics from hooks (exercises, project tracking)
-- **Grafana** - Dashboard visualization (pre-configured dashboard included)
-
-### Setup
+### Quick Start
 
 ```bash
-# Enable Claude Code telemetry (add to shell profile)
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# View combined usage and exercise data
+./vibereps-usage.py
 
-# Start monitoring stack
-cd monitoring
-docker-compose up -d
-
-# View Grafana dashboard
-open http://localhost:3000  # Default: admin/admin
+# Pass arguments through to ccusage
+./vibereps-usage.py --since 2026-01-01
 ```
 
-### Available Metrics
+### How It Works
 
-**From Claude Code (via OTEL):**
-- `claude_code_session_count` - CLI sessions started
-- `claude_code_token_usage_tokens_total` - Tokens by type (input/output/cache)
-- `claude_code_cost_usage_usd_total` - Cost by model
-- `claude_code_lines_of_code_count_total` - Lines added/removed
-- `claude_code_code_edit_tool_decision_total` - Edit accepts/rejects
-- `claude_code_active_time_total_seconds_total` - CLI active time
+1. Exercise completions are logged to `~/.vibereps/exercises.jsonl`
+2. `vibereps-usage.py` combines this with `ccusage` output (reads `~/.claude/statsig/usage.jsonl`)
+3. Both data sources are grouped by date for a unified view
 
-**From Hooks (via Pushgateway):**
-- `exercise_reps_total` - Exercise reps by type
-- `exercise_sessions_total` - Exercise session count
-- `claude_project_session_total` - Sessions by project/branch
+### Exercise Log Format
 
-### Reference
+```json
+{"timestamp": "2026-01-13T10:30:00", "exercise": "squats", "reps": 5, "duration": 45, "mode": "quick"}
+```
 
-For complete OTEL configuration options, see: https://code.claude.com/docs/en/monitoring-usage
+### Requirements
 
-Key environment variables:
-- `CLAUDE_CODE_ENABLE_TELEMETRY=1` - Required to enable telemetry
-- `OTEL_METRIC_EXPORT_INTERVAL=10000` - Export interval in ms (default 60000)
-- `OTEL_RESOURCE_ATTRIBUTES` - Add custom labels (e.g., `team=platform`)
+- [ccusage](https://github.com/ryoppippi/ccusage) - `npm install -g ccusage`
 
 ## Privacy & Security
 
