@@ -5,10 +5,10 @@ export default defineConfig({
   title: config.name,
   description: `${config.tagline} ${config.description}`,
 
-  base: '/vibereps/',
+  base: '/',
 
   head: [
-    ['link', { rel: 'icon', href: '/vibereps/favicon.ico' }]
+    ['link', { rel: 'icon', href: '/favicon.ico' }]
   ],
 
   themeConfig: {
