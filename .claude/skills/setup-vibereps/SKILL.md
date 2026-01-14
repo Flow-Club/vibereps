@@ -25,6 +25,10 @@ Options:
 - standing_crunches: "Core workout, elbow to opposite knee"
 - side_stretches: "Flexibility, relieves back tension"
 - pushups: "Upper body, requires floor space"
+- shoulder_shrugs: "Seated, releases neck tension (tech neck)"
+- chin_tucks: "Seated, corrects forward head posture"
+- neck_tilts: "Seated, stretches sides of neck"
+- neck_rotations: "Seated, improves neck mobility"
 ```
 
 ### Step 2: Ask Trigger Preference

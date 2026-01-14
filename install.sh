@@ -51,7 +51,6 @@ setup_permissions() {
     print_step "Setting up permissions"
     chmod +x "$INSTALL_DIR/exercise_tracker.py"
     chmod +x "$INSTALL_DIR/notify_complete.py"
-    [[ -f "$INSTALL_DIR/track_project.py" ]] && chmod +x "$INSTALL_DIR/track_project.py"
     print_success "Scripts are executable"
 }
 
@@ -175,6 +174,7 @@ show_summary() {
     echo -e "  ${YELLOW}Next steps:${NC}"
     echo "    • Restart Claude Code to activate hooks"
     echo "    • Grant camera permission when prompted"
+    echo "    • Run /setup-vibereps in Claude Code to customize exercises"
     echo ""
     echo -e "  ${YELLOW}Test it now:${NC}"
     echo "    $INSTALL_DIR/exercise_tracker.py post_tool_use '{}'"

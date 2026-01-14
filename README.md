@@ -202,6 +202,19 @@ which python3  # Use this path if needed
 - Check browser notification settings
 - Check system notification preferences
 
+## 🤖 Claude Code Skills
+
+VibeReps includes built-in skills you can run in Claude Code:
+
+| Command | Description |
+|---------|-------------|
+| `/setup-vibereps` | Interactive setup wizard - customize exercises and triggers |
+| `/test-tracker` | Launch, restart, or test the exercise tracker |
+| `/add-exercise` | Add a new exercise type with pose detection |
+| `/tune-detection` | Adjust detection thresholds if reps aren't counting correctly |
+
+**Example:** After installing, run `/setup-vibereps` in Claude Code to pick your preferred exercises.
+
 ## 📚 More Info
 
 - `CLAUDE.md` - Technical architecture, remote server setup, and monitoring stack

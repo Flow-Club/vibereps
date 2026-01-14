@@ -79,6 +79,19 @@ VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/exercise_tracker.py post_too
 ~/.vibereps/notify_complete.py '{}'
 ```
 
+## Customize with Claude Code Skills
+
+After installing, you can use these commands in Claude Code:
+
+| Command | Description |
+|---------|-------------|
+| `/setup-vibereps` | Interactive setup wizard - customize exercises and triggers |
+| `/test-tracker` | Launch, restart, or test the exercise tracker |
+| `/add-exercise` | Add a new exercise type with pose detection |
+| `/tune-detection` | Adjust detection thresholds if reps aren't counting correctly |
+
+**Recommended:** Run `/setup-vibereps` to pick your preferred exercises instead of using the defaults.
+
 ## Next Steps
 
 - [Configure exercises and reps](/guide/configuration)
