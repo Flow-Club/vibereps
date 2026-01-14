@@ -325,6 +325,7 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     claude_complete = False
     quick_mode = False
     claude_context = {}  # What Claude is working on (from hook payload + transcript)
+    tracker = None  # Reference to ExerciseTrackerHook for shutdown coordination
 
     def do_GET(self):
         """Serve the exercise tracker HTML and exercise definitions"""
@@ -435,6 +436,19 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "notified"}).encode())
             except Exception as e:
                 self.send_error(500, str(e))
+        elif self.path == '/shutdown':
+            # Clean shutdown requested by browser
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "shutting_down"}).encode())
+
+                # Signal shutdown to the tracker
+                if hasattr(ExerciseHTTPHandler, 'tracker') and ExerciseHTTPHandler.tracker:
+                    ExerciseHTTPHandler.tracker.shutdown_requested = True
+            except Exception:
+                pass  # May fail if connection closed
         else:
             self.send_error(404)
 
@@ -501,11 +515,42 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
         return None
 
 
+PORT_FILE = Path("/tmp/vibereps-port")
+PORT_RANGE = range(8765, 8775)  # Try ports 8765-8774
+
+
 class ExerciseTrackerHook:
     def __init__(self):
-        self.port = 8765
+        self.port = None
         self.server = None
         self.server_thread = None
+        self.shutdown_requested = False
+
+    def find_available_port(self):
+        """Find an available port in the range, using port binding as the lock."""
+        for port in PORT_RANGE:
+            try:
+                # Try to bind - this is atomic and self-cleaning
+                test_server = HTTPServer(('localhost', port), ExerciseHTTPHandler)
+                test_server.server_close()  # Release immediately, we'll rebind
+                return port
+            except OSError:
+                continue
+        return None
+
+    def write_port_file(self):
+        """Write current port to discovery file for notify_complete.py"""
+        try:
+            PORT_FILE.write_text(str(self.port))
+        except Exception:
+            pass  # Non-critical
+
+    def cleanup_port_file(self):
+        """Remove port file on shutdown"""
+        try:
+            PORT_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     def start_web_server(self, quick_mode=False):
         """Start a local web server to handle webcam UI"""
@@ -514,12 +559,21 @@ class ExerciseTrackerHook:
         ExerciseHTTPHandler.completion_data = {}
         ExerciseHTTPHandler.claude_complete = False
         ExerciseHTTPHandler.quick_mode = quick_mode
+        ExerciseHTTPHandler.tracker = self  # Reference for shutdown endpoint
+
+        # Find available port
+        self.port = self.find_available_port()
+        if not self.port:
+            raise RuntimeError(f"No available port in range {PORT_RANGE.start}-{PORT_RANGE.stop-1}")
 
         # Start server
         self.server = HTTPServer(('localhost', self.port), ExerciseHTTPHandler)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
+
+        # Write port to discovery file
+        self.write_port_file()
 
         url = f"http://localhost:{self.port}"
         if quick_mode:
@@ -539,7 +593,7 @@ class ExerciseTrackerHook:
 
     def run_server_daemon(self, quick_mode=True):
         """Run the server in daemon mode (blocking)"""
-        url = self.start_web_server(quick_mode=quick_mode)
+        self.start_web_server(quick_mode=quick_mode)
 
         # Browser is opened by parent process, not here
         # Keep server running until completion, browser closes, or timeout
@@ -548,24 +602,31 @@ class ExerciseTrackerHook:
         timeout = 120 if quick_mode else 600
         start_time = time.time()
 
-        while time.time() - start_time < timeout:
-            if ExerciseHTTPHandler.exercise_complete:
-                print("✅ Session complete!")
-                break
-
-            # Check if browser window was closed (Chrome process gone)
-            if not is_vibereps_window_open():
-                # Give a small grace period in case browser is just slow
-                time.sleep(2)
-                if not is_vibereps_window_open():
-                    print("🚪 Browser window closed")
+        try:
+            while time.time() - start_time < timeout:
+                if ExerciseHTTPHandler.exercise_complete:
+                    print("✅ Session complete!")
                     break
 
-            time.sleep(1)
+                # Check if shutdown was requested via /shutdown endpoint
+                if self.shutdown_requested:
+                    print("🛑 Shutdown requested")
+                    break
 
-        # Shutdown server
-        if self.server:
-            self.server.shutdown()
+                # Check if browser window was closed (Chrome process gone)
+                if not is_vibereps_window_open():
+                    # Give a small grace period in case browser is just slow
+                    time.sleep(2)
+                    if not is_vibereps_window_open():
+                        print("🚪 Browser window closed")
+                        break
+
+                time.sleep(1)
+        finally:
+            # Always clean up
+            self.cleanup_port_file()
+            if self.server:
+                self.server.shutdown()
 
     def handle_hook(self, event_type, data):
         """Main hook handler"""
@@ -592,15 +653,29 @@ class ExerciseTrackerHook:
                 except (FileExistsError, OSError):
                     return {"status": "skipped", "message": "Exercise tracker launch in progress"}
 
-            # Check if server is already running
-            try:
-                urllib.request.urlopen("http://localhost:8765/status", timeout=1)
-                # Server already running, skip (but keep lock for a moment)
+            # Check if server is already running (check port file first, then scan range)
+            def check_server_running():
+                # Try port file first
+                if PORT_FILE.exists():
+                    try:
+                        port = int(PORT_FILE.read_text().strip())
+                        urllib.request.urlopen(f"http://localhost:{port}/status", timeout=1)
+                        return port
+                    except (ValueError, urllib.error.URLError, OSError):
+                        pass
+                # Scan port range
+                for port in PORT_RANGE:
+                    try:
+                        urllib.request.urlopen(f"http://localhost:{port}/status", timeout=0.5)
+                        return port
+                    except (urllib.error.URLError, OSError):
+                        continue
+                return None
+
+            running_port = check_server_running()
+            if running_port:
                 lock_file.unlink(missing_ok=True)
                 return {"status": "skipped", "message": "Exercise tracker already running"}
-            except BaseException:
-                # Server not running, launch it
-                pass
 
             # Launch detached background process
             script_path = os.path.abspath(__file__)
@@ -612,9 +687,13 @@ class ExerciseTrackerHook:
                 start_new_session=True  # Detach from parent
             )
 
-            # Give server a moment to start, then open browser from this process
+            # Give server a moment to start, then read port from file
             time.sleep(0.5)
-            url = f"http://localhost:{self.port}?quick=true"
+            try:
+                port = int(PORT_FILE.read_text().strip()) if PORT_FILE.exists() else PORT_RANGE.start
+            except (ValueError, OSError):
+                port = PORT_RANGE.start
+            url = f"http://localhost:{port}?quick=true"
             exercises = get_filtered_exercises()
             if exercises:
                 url += f"&exercises={exercises}"

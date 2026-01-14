@@ -2016,6 +2016,17 @@ const selector = document.getElementById('exerciseSelector');
         });
 
         // ============================================
+        // Clean shutdown on window close
+        // ============================================
+        function notifyShutdown() {
+            // Use sendBeacon for reliable delivery during page unload
+            navigator.sendBeacon('/shutdown', '');
+        }
+
+        window.addEventListener('beforeunload', notifyShutdown);
+        window.addEventListener('pagehide', notifyShutdown);
+
+        // ============================================
         // Initialize on page load
         // ============================================
         loadClaudeContext();
