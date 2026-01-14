@@ -3,6 +3,7 @@
   "name": "Shoulder Shrugs",
   "description": "Releases neck and upper trap tension from tech neck",
   "category": "posture",
+  "seated": true,
 
   "reps": {
     "normal": 15,

@@ -332,6 +332,107 @@
         .claude-context:empty {
             display: none;
         }
+
+        /* Compact exercise toggle */
+        .exercise-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            margin: 4px 0 8px 0;
+            font-size: 12px;
+        }
+        .exercise-toggle.active {
+            display: flex;
+        }
+        .exercise-toggle::before {
+            content: ">";
+            color: var(--text-dim);
+            margin-right: 4px;
+        }
+        .exercise-toggle-name {
+            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .exercise-toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 14px;
+            font-family: inherit;
+            line-height: 1;
+            transition: color 0.15s, transform 0.15s;
+            opacity: 0.7;
+        }
+        .exercise-toggle-btn:hover {
+            color: var(--accent);
+            opacity: 1;
+            transform: rotate(45deg);
+        }
+        .exercise-toggle-btn:active {
+            transform: rotate(180deg);
+        }
+        /* Dropdown for exercise selection */
+        .exercise-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .exercise-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            min-width: 140px;
+            max-height: 180px;
+            overflow-y: auto;
+            z-index: 100;
+            margin-top: 4px;
+        }
+        .exercise-dropdown-menu.open {
+            display: block;
+        }
+        .exercise-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 6px 10px;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 11px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .exercise-dropdown-item:hover {
+            background: var(--bg-light);
+            color: var(--accent);
+        }
+        .exercise-dropdown-item.current {
+            color: var(--accent);
+        }
+        .exercise-dropdown-item.current::before {
+            content: "› ";
+        }
+
+        /* Seated exercises link */
+        .seated-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85em;
+            opacity: 0.8;
+            transition: opacity 0.15s;
+        }
+        .seated-link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -348,6 +449,14 @@
         </div>
         <h1 id="title">vibereps</h1>
         <p class="subtitle" id="subtitle">time to move</p>
+
+        <div class="exercise-toggle" id="exerciseToggle">
+            <div class="exercise-dropdown">
+                <span class="exercise-toggle-name" id="exerciseToggleName">squats</span>
+                <button class="exercise-toggle-btn" id="exerciseToggleBtn" title="Change exercise">⟳</button>
+                <div class="exercise-dropdown-menu" id="exerciseDropdown"></div>
+            </div>
+        </div>
 
         <div class="claude-context" id="claudeContext"></div>
 
@@ -462,7 +571,7 @@ const selector = document.getElementById('exerciseSelector');
                     if (enabledExercises.length > 0) {
                         const randomExercise = enabledExercises[Math.floor(Math.random() * enabledExercises.length)];
                         selector.style.display = 'none';
-                        document.getElementById('subtitle').textContent = `starting ${randomExercise.replace('_', ' ')}...`;
+                        showExerciseToggle(randomExercise);
                         setTimeout(() => startWithStandUpCheck(randomExercise), 500);
                     }
                 }
@@ -513,17 +622,46 @@ const selector = document.getElementById('exerciseSelector');
         async function startWithStandUpCheck(exerciseId) {
             pendingExercise = exerciseId;
             standUpVerified = false;
-            currentExercise = '_standup_check';
             repCount = 0;
             exerciseState = 'checking';
             startTime = Date.now();
 
+            // Show exercise toggle
+            showExerciseToggle(exerciseId);
             document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = true);
             document.getElementById('counter').textContent = '?';
-            document.getElementById('status').textContent = 'Stand up and step back so your full body is visible...';
+
+            // Check if this is a seated exercise (skip standup check)
+            const config = exerciseConfigs[exerciseId];
+            const isSeated = config?.seated === true;
+
+            if (isSeated) {
+                currentExercise = exerciseId;
+                currentConfig = config;
+                exerciseState = 'ready';
+                standUpVerified = true;
+                document.getElementById('status').textContent = 'Position yourself so your upper body is visible...';
+            } else {
+                currentExercise = '_standup_check';
+                document.getElementById('status').textContent = 'Stand up and step back so your full body is visible...';
+            }
 
             try {
                 const video = document.getElementById('video');
+
+                // Stop any existing stream/loop
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                if (camera) {
+                    camera.stop();
+                    camera = null;
+                }
+                if (frameLoopId) {
+                    cancelAnimationFrame(frameLoopId);
+                    frameLoopId = null;
+                }
+
                 const videoConstraints = {
                     width: 320,
                     height: 240
@@ -532,27 +670,39 @@ const selector = document.getElementById('exerciseSelector');
                 if (selectedCameraId) {
                     videoConstraints.deviceId = { exact: selectedCameraId };
                 }
+
+                console.log('Requesting camera with constraints:', videoConstraints);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: videoConstraints
                 });
                 video.srcObject = stream;
                 document.getElementById('videoContainer').classList.add('active');
+                console.log('Camera stream started');
 
                 if (!pose) {
                     const success = await initPose();
                     if (!success) return;
                 }
 
-                if (typeof Camera !== 'undefined') {
-                    camera = new Camera(video, {
-                        onFrame: async () => { await pose.send({image: video}); },
-                        width: 320,
-                        height: 240
-                    });
-                    await camera.start();
-                }
+                // Use manual frame loop instead of MediaPipe Camera class
+                // (Camera class calls getUserMedia internally and ignores our deviceId)
+                console.log('Starting pose detection frame loop');
+                const sendFrame = async () => {
+                    if (video.readyState >= 2) {
+                        try {
+                            await pose.send({image: video});
+                        } catch (e) {
+                            console.error('Pose send error:', e);
+                        }
+                    }
+                    frameLoopId = requestAnimationFrame(sendFrame);
+                };
+                frameLoopId = requestAnimationFrame(sendFrame);
+
             } catch (error) {
-                document.getElementById('status').textContent = 'Error: ' + error.message;
+                console.error('Exercise start error:', error);
+                const msg = error?.message || error?.name || String(error) || 'Unknown error';
+                document.getElementById('status').textContent = 'Error: ' + msg;
                 document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = false);
             }
         }
@@ -570,7 +720,7 @@ const selector = document.getElementById('exerciseSelector');
                 .every(p => p && p.visibility > 0.5);
 
             if (!allVisible) {
-                document.getElementById('status').textContent = 'Step back - need to see your full body (head to feet)';
+                document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
                 return false;
             }
 
@@ -605,24 +755,35 @@ const selector = document.getElementById('exerciseSelector');
         async function initPose() {
             if (typeof Pose === 'undefined') {
                 document.getElementById('status').textContent = 'Error: MediaPipe libraries not loaded';
+                console.error('MediaPipe Pose not loaded');
                 return false;
             }
 
-            pose = new Pose({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
-                }
-            });
+            try {
+                console.log('Initializing MediaPipe Pose...');
+                pose = new Pose({
+                    locateFile: (file) => {
+                        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                        console.log('Loading MediaPipe file:', url);
+                        return url;
+                    }
+                });
 
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
+                pose.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
 
-            pose.onResults(onPoseResults);
-            return true;
+                pose.onResults(onPoseResults);
+                console.log('MediaPipe Pose initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('MediaPipe init error:', error);
+                document.getElementById('status').textContent = 'Error initializing pose detection: ' + (error?.message || error);
+                return false;
+            }
         }
 
         function onPoseResults(results) {
@@ -1456,7 +1617,7 @@ const selector = document.getElementById('exerciseSelector');
                     const nextExercise = pickNextExercise();
                     if (nextExercise) {
                         const exName = exercises[nextExercise].name;
-                        document.getElementById('subtitle').textContent = `starting ${exName.toLowerCase()}...`;
+                        showExerciseToggle(nextExercise);
                         document.getElementById('status').textContent = `Nice! ${exName} next...`;
                         setTimeout(() => {
                             startWithStandUpCheck(nextExercise);
@@ -1752,6 +1913,105 @@ const selector = document.getElementById('exerciseSelector');
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ============================================
+        // Exercise toggle
+        // ============================================
+        function showExerciseToggle(exerciseId) {
+            const toggle = document.getElementById('exerciseToggle');
+            const nameEl = document.getElementById('exerciseToggleName');
+            const name = exercises[exerciseId]?.name || exerciseId.replace('_', ' ');
+            nameEl.textContent = name.toLowerCase();
+            toggle.classList.add('active');
+            document.getElementById('subtitle').style.display = 'none';
+            populateExerciseDropdown(exerciseId);
+        }
+
+        function hideExerciseToggle() {
+            document.getElementById('exerciseToggle').classList.remove('active');
+            document.getElementById('subtitle').style.display = '';
+            closeExerciseDropdown();
+        }
+
+        function populateExerciseDropdown(currentId) {
+            const dropdown = document.getElementById('exerciseDropdown');
+            dropdown.innerHTML = '';
+
+            for (const id of Object.keys(exercises)) {
+                if (id.startsWith('_')) continue;
+                const btn = document.createElement('button');
+                btn.className = 'exercise-dropdown-item' + (id === currentId ? ' current' : '');
+                btn.textContent = exercises[id].name;
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    closeExerciseDropdown();
+                    if (id !== currentId) {
+                        switchExercise(id);
+                    }
+                };
+                dropdown.appendChild(btn);
+            }
+        }
+
+        function toggleExerciseDropdown() {
+            const dropdown = document.getElementById('exerciseDropdown');
+            dropdown.classList.toggle('open');
+        }
+
+        function closeExerciseDropdown() {
+            document.getElementById('exerciseDropdown').classList.remove('open');
+        }
+
+        function switchExercise(newExerciseId) {
+            // Stop current exercise detection
+            if (frameLoopId) {
+                cancelAnimationFrame(frameLoopId);
+                frameLoopId = null;
+            }
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('videoContainer').classList.remove('active');
+
+            // Reset state
+            repCount = 0;
+            exerciseState = null;
+            detectionState = {};
+            document.getElementById('counter').textContent = '0';
+
+            // Start new exercise
+            startWithStandUpCheck(newExerciseId);
+        }
+
+        function switchToSeatedExercise() {
+            // Find a random seated exercise
+            const seatedExercises = Object.keys(exercises).filter(id => {
+                const config = exerciseConfigs[id];
+                return config?.seated === true;
+            });
+
+            if (seatedExercises.length === 0) {
+                document.getElementById('status').textContent = 'No seated exercises available';
+                return;
+            }
+
+            const randomSeated = seatedExercises[Math.floor(Math.random() * seatedExercises.length)];
+            switchExercise(randomSeated);
+        }
+
+        // Toggle button click handler
+        document.getElementById('exerciseToggleBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleExerciseDropdown();
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.exercise-dropdown')) {
+                closeExerciseDropdown();
+            }
+        });
 
         // ============================================
         // Initialize on page load

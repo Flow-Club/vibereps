@@ -31,6 +31,9 @@ def load_exercise_data():
                 date = ts.split("T")[0] if "T" in ts else ts[:10]
                 exercise = entry.get("exercise", "unknown")
                 reps = entry.get("reps", 0)
+                # Skip internal states and zero-rep entries
+                if exercise.startswith("_") or reps <= 0:
+                    continue
                 by_date[date][exercise] += reps
             except (json.JSONDecodeError, KeyError):
                 continue

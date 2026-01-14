@@ -1,0 +1,32 @@
+{
+  "id": "neck_tilts",
+  "name": "Neck Tilts",
+  "description": "Stretches the sides of the neck (scalenes, upper traps) - great for desk workers",
+  "category": "posture",
+  "seated": true,
+
+  "reps": {
+    "normal": 10,
+    "quick": 6
+  },
+
+  "detection": {
+    "type": "tilt",
+    "landmarks": {
+      "upper": [0],
+      "lower": [11, 12],
+      "_names": ["nose", "shoulders"]
+    },
+    "thresholds": {
+      "trigger": 0.15
+    },
+    "states": ["center", "side"],
+    "countOn": "center"
+  },
+
+  "instructions": {
+    "ready": "Tilt ear toward shoulder (left or right)",
+    "side": "Good stretch! Hold briefly, return to center",
+    "center": "Nice! Now tilt to the other side"
+  }
+}

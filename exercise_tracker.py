@@ -114,7 +114,7 @@ def is_vibereps_window_open():
     return False
 
 
-def open_small_window(url: str, width: int = 340, height: int = 520):
+def open_small_window(url: str, width: int = 340, height: int = 580):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
@@ -398,8 +398,12 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 duration = data.get("duration", 0)
                 mode = "quick" if ExerciseHTTPHandler.quick_mode else "normal"
 
-                local_logged = log_to_local(exercise, reps, duration, mode)
-                remote_logged = log_to_remote(exercise, reps, duration)
+                # Don't log internal states like _standup_check
+                local_logged = False
+                remote_logged = False
+                if exercise and not exercise.startswith("_") and reps > 0:
+                    local_logged = log_to_local(exercise, reps, duration, mode)
+                    remote_logged = log_to_remote(exercise, reps, duration)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')

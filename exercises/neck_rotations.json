@@ -1,0 +1,32 @@
+{
+  "id": "neck_rotations",
+  "name": "Neck Rotations",
+  "description": "Improves neck mobility and relieves stiffness from screen time",
+  "category": "posture",
+  "seated": true,
+
+  "reps": {
+    "normal": 10,
+    "quick": 6
+  },
+
+  "detection": {
+    "type": "tilt",
+    "landmarks": {
+      "upper": [0],
+      "lower": [11, 12],
+      "_names": ["nose", "shoulders"]
+    },
+    "thresholds": {
+      "trigger": 0.12
+    },
+    "states": ["center", "side"],
+    "countOn": "center"
+  },
+
+  "instructions": {
+    "ready": "Turn head to look left or right",
+    "side": "Good! Hold briefly, return to center",
+    "center": "Nice! Now turn to the other side"
+  }
+}

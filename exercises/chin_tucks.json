@@ -3,6 +3,7 @@
   "name": "Chin Tucks",
   "description": "Corrects forward head posture (tech neck) by strengthening deep neck flexors",
   "category": "posture",
+  "seated": true,
 
   "reps": {
     "normal": 10,
