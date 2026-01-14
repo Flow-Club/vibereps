@@ -1,0 +1,31 @@
+{
+  "id": "shoulder_shrugs",
+  "name": "Shoulder Shrugs",
+  "description": "Releases neck and upper trap tension from tech neck",
+  "category": "posture",
+
+  "reps": {
+    "normal": 15,
+    "quick": 8
+  },
+
+  "detection": {
+    "type": "height_baseline",
+    "landmarks": {
+      "primary": [11, 12],
+      "_names": ["left_shoulder", "right_shoulder"]
+    },
+    "thresholds": {
+      "trigger": 0.03,
+      "release": 0.009
+    },
+    "states": ["ready", "up", "down"],
+    "countOn": "down"
+  },
+
+  "instructions": {
+    "ready": "Shrug shoulders up toward ears!",
+    "up": "Hold! Now slowly lower your shoulders",
+    "down": "Good! Shrug up again"
+  }
+}

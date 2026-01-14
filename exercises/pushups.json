@@ -1,0 +1,32 @@
+{
+  "id": "pushups",
+  "name": "Push-ups",
+  "description": "Strengthens chest, shoulders, and triceps",
+  "category": "strength",
+
+  "reps": {
+    "normal": 10,
+    "quick": 5
+  },
+
+  "detection": {
+    "type": "angle",
+    "landmarks": {
+      "joint": [11, 13, 15],
+      "joint_alt": [12, 14, 16],
+      "_names": ["left_shoulder/elbow/wrist", "right_shoulder/elbow/wrist"]
+    },
+    "thresholds": {
+      "down": 90,
+      "up": 150
+    },
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
+  },
+
+  "instructions": {
+    "ready": "Get in plank position",
+    "down": "Going down...",
+    "up": "Push up!"
+  }
+}

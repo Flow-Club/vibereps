@@ -1,0 +1,31 @@
+{
+  "id": "calf_raises",
+  "name": "Calf Raises",
+  "description": "Improves circulation and strengthens calves, great for desk workers",
+  "category": "strength",
+
+  "reps": {
+    "normal": 15,
+    "quick": 8
+  },
+
+  "detection": {
+    "type": "height_relative",
+    "landmarks": {
+      "target": [29, 30],
+      "reference": [31, 32],
+      "_names": ["heels (rise)", "toes (stay grounded)"]
+    },
+    "thresholds": {
+      "trigger": 0.015
+    },
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
+  },
+
+  "instructions": {
+    "ready": "Rise up on your toes!",
+    "up": "Good! Now lower your heels",
+    "down": "Rise again!"
+  }
+}

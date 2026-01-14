@@ -1,0 +1,29 @@
+{
+  "id": "jumping_jacks",
+  "name": "Jumping Jacks",
+  "description": "Cardio exercise that gets blood flowing and wakes up the body",
+  "category": "cardio",
+
+  "reps": {
+    "normal": 20,
+    "quick": 10
+  },
+
+  "detection": {
+    "type": "position_relative",
+    "landmarks": {
+      "target": [15, 16],
+      "reference": [11, 12],
+      "_names": ["wrists", "shoulders"]
+    },
+    "condition": "above",
+    "states": ["ready", "up", "down"],
+    "countOn": "up"
+  },
+
+  "instructions": {
+    "ready": "Jump and raise arms!",
+    "up": "Arms up! Now down",
+    "down": "Jump again!"
+  }
+}

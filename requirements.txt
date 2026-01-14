@@ -1,0 +1,16 @@
+# Exercise Tracker Requirements
+
+# MCP Server SDK
+mcp>=0.9.0
+
+# No additional dependencies needed for the hook script
+# The hook uses only Python standard library:
+# - http.server
+# - webbrowser
+# - threading
+# - json
+# - pathlib
+
+# The frontend uses CDN-hosted libraries:
+# - MediaPipe Pose (from CDN)
+# - MediaPipe Camera Utils (from CDN)

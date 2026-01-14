@@ -1,0 +1,29 @@
+<svg width="400" height="100" viewBox="0 0 400 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background (Optional: remove for transparency) -->
+  <rect width="400" height="100" rx="12" fill="#0f172a"/>
+
+  <!-- Icon Group: The Code Dumbbell -->
+  <g transform="translate(30, 20)">
+    <!-- Handle -->
+    <rect x="18" y="26" width="44" height="8" rx="4" fill="#cbd5e1"/>
+
+    <!-- Left Weight: Opening Curly Brace -->
+    <path d="M24 6C24 6 10 6 10 22C10 26 10 26 2 30C10 34 10 34 10 38C10 54 24 54 24 54"
+          stroke="#22d3ee" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Weight: Closing Curly Brace -->
+    <path d="M56 6C56 6 70 6 70 22C70 26 70 26 78 30C70 34 70 34 70 38C70 54 56 54 56 54"
+          stroke="#a3e635" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Text -->
+  <g font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-weight="800" font-size="52" letter-spacing="-1">
+    <text x="125" y="68" fill="#22d3ee">vibe</text>
+    <text x="230" y="68" fill="#a3e635">reps</text>
+  </g>
+
+  <!-- Cursor underscore for extra dev feel -->
+  <rect x="338" y="68" width="28" height="6" fill="#cbd5e1">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite" />
+  </rect>
+</svg>

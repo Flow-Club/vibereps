@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Claude Code Exercise Break</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+    <style>
+        :root, [data-theme="vscode"] {
+            --bg: #1e1e1e;
+            --bg-light: #2d2d2d;
+            --border: #404040;
+            --text: #d4d4d4;
+            --text-dim: #808080;
+            --accent: #4ec9b0;
+            --success: #6a9955;
+            --warn: #dcdcaa;
+        }
+        [data-theme="dracula"] {
+            --bg: #282a36;
+            --bg-light: #343746;
+            --border: #44475a;
+            --text: #f8f8f2;
+            --text-dim: #6272a4;
+            --accent: #bd93f9;
+            --success: #50fa7b;
+            --warn: #f1fa8c;
+        }
+        [data-theme="nord"] {
+            --bg: #2e3440;
+            --bg-light: #3b4252;
+            --border: #4c566a;
+            --text: #eceff4;
+            --text-dim: #7b88a1;
+            --accent: #88c0d0;
+            --success: #a3be8c;
+            --warn: #ebcb8b;
+        }
+        [data-theme="solarized"] {
+            --bg: #002b36;
+            --bg-light: #073642;
+            --border: #586e75;
+            --text: #839496;
+            --text-dim: #657b83;
+            --accent: #2aa198;
+            --success: #859900;
+            --warn: #b58900;
+        }
+        [data-theme="monokai"] {
+            --bg: #272822;
+            --bg-light: #3e3d32;
+            --border: #49483e;
+            --text: #f8f8f2;
+            --text-dim: #75715e;
+            --accent: #a6e22e;
+            --success: #a6e22e;
+            --warn: #e6db74;
+        }
+        [data-theme="gruvbox"] {
+            --bg: #282828;
+            --bg-light: #3c3836;
+            --border: #504945;
+            --text: #ebdbb2;
+            --text-dim: #928374;
+            --accent: #fe8019;
+            --success: #b8bb26;
+            --warn: #fabd2f;
+        }
+        [data-theme="tokyo-night"] {
+            --bg: #1a1b26;
+            --bg-light: #24283b;
+            --border: #414868;
+            --text: #c0caf5;
+            --text-dim: #565f89;
+            --accent: #7aa2f7;
+            --success: #9ece6a;
+            --warn: #e0af68;
+        }
+        [data-theme="catppuccin"] {
+            --bg: #1e1e2e;
+            --bg-light: #313244;
+            --border: #45475a;
+            --text: #cdd6f4;
+            --text-dim: #7f849c;
+            --accent: #cba6f7;
+            --success: #a6e3a1;
+            --warn: #f9e2af;
+        }
+        body {
+            font-family: "SF Mono", "Fira Code", "JetBrains Mono", Menlo, Monaco, "Courier New", monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            margin: 0;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+        .container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            padding: 12px;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+            font-weight: normal;
+            color: var(--accent);
+            text-align: center;
+        }
+        h1::before { content: "$ "; color: var(--text-dim); }
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            font-size: 0.9em;
+        }
+        .exercise-selector {
+            display: flex;
+            gap: 6px;
+            margin: 12px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        button.active {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        #videoContainer {
+            position: relative;
+            margin: 8px 0;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            display: none;
+        }
+        #videoContainer.active {
+            display: block;
+        }
+        video {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            filter: grayscale(30%) contrast(1.1);
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .counter {
+            font-size: 2.2em;
+            font-weight: bold;
+            margin: 8px 0;
+            text-align: center;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+        }
+        .counter::before { content: "["; color: var(--text-dim); }
+        .counter::after { content: "]"; color: var(--text-dim); }
+        .status {
+            text-align: center;
+            font-size: 0.9em;
+            margin: 8px 0;
+            line-height: 1.4;
+            color: var(--warn);
+            min-height: 2.8em;
+        }
+        .finish-btn {
+            background: var(--bg);
+            border-color: var(--success);
+            color: var(--success);
+            margin-top: 8px;
+            width: 100%;
+        }
+        .finish-btn:hover {
+            background: var(--success);
+            color: var(--bg);
+        }
+        .rep-count {
+            color: var(--accent);
+        }
+        .theme-bar {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .theme-btn {
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .theme-btn:hover {
+            transform: scale(1.2);
+            border-color: var(--text);
+        }
+        .theme-btn.active {
+            border: 2px solid var(--text);
+        }
+        .theme-btn[data-t="vscode"] { background: #4ec9b0; }
+        .theme-btn[data-t="dracula"] { background: #bd93f9; }
+        .theme-btn[data-t="nord"] { background: #88c0d0; }
+        .theme-btn[data-t="solarized"] { background: #2aa198; }
+        .theme-btn[data-t="monokai"] { background: #a6e22e; }
+        .theme-btn[data-t="gruvbox"] { background: #fe8019; }
+        .theme-btn[data-t="tokyo-night"] { background: #7aa2f7; }
+        .theme-btn[data-t="catppuccin"] { background: #cba6f7; }
+        .loading { text-align: center; color: var(--text-dim); padding: 20px; }
+
+        /* Camera selector - terminal style */
+        .camera-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 8px 0;
+            padding: 6px 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            font-size: 11px;
+        }
+        .camera-selector::before {
+            content: ">";
+            color: var(--accent);
+            font-weight: bold;
+        }
+        .camera-selector label {
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+        .camera-selector select {
+            flex: 1;
+            min-width: 0;
+            padding: 4px 6px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23808080' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            padding-right: 20px;
+        }
+        .camera-selector select:hover {
+            border-color: var(--accent);
+        }
+        .camera-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+        .camera-selector select option {
+            background: var(--bg-light);
+            color: var(--text);
+            padding: 4px;
+        }
+        .camera-selector .cam-status {
+            color: var(--success);
+            font-size: 10px;
+        }
+        .camera-selector .cam-status.error {
+            color: var(--warn);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="theme-bar">
+            <button class="theme-btn" data-t="vscode" title="VS Code"></button>
+            <button class="theme-btn" data-t="dracula" title="Dracula"></button>
+            <button class="theme-btn" data-t="nord" title="Nord"></button>
+            <button class="theme-btn" data-t="solarized" title="Solarized"></button>
+            <button class="theme-btn" data-t="monokai" title="Monokai"></button>
+            <button class="theme-btn" data-t="gruvbox" title="Gruvbox"></button>
+            <button class="theme-btn" data-t="tokyo-night" title="Tokyo Night"></button>
+            <button class="theme-btn" data-t="catppuccin" title="Catppuccin"></button>
+        </div>
+        <h1 id="title">vibereps</h1>
+        <p class="subtitle" id="subtitle">time to move</p>
+
+        <div class="camera-selector" id="cameraSelector">
+            <label>cam:</label>
+            <select id="cameraSelect">
+                <option value="">detecting...</option>
+            </select>
+            <span class="cam-status" id="camStatus"></span>
+        </div>
+
+        <div class="exercise-selector" id="exerciseSelector">
+            <div class="loading">Loading exercises...</div>
+        </div>
+
+        <div id="videoContainer">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas" width="320" height="240"></canvas>
+        </div>
+
+        <div class="counter" id="counter">0</div>
+        <div class="status" id="status">Select an exercise to begin!</div>
+
+        <button class="finish-btn" onclick="finishSession()">Finish Session</button>
+    </div>
+
+    <script>
+        // ============================================
+        // Theme handling
+        // ============================================
+        const themeColors = {
+            'vscode': '#4ec9b0', 'dracula': '#bd93f9', 'nord': '#88c0d0', 'solarized': '#2aa198',
+            'monokai': '#a6e22e', 'gruvbox': '#fe8019', 'tokyo-night': '#7aa2f7', 'catppuccin': '#cba6f7'
+        };
+        let currentTheme = localStorage.getItem('vibereps-theme') || 'vscode';
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('vibereps-theme', theme);
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.t === theme);
+            });
+        }
+
+        setTheme(currentTheme);
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => setTheme(btn.dataset.t));
+        });
+
+        // ============================================
+        // State variables
+        // ============================================
+        let exercises = {};           // Loaded exercise definitions
+        let exerciseConfigs = {};     // Full config for each exercise
+        let currentExercise = null;
+        let currentConfig = null;
+        let repCount = 0;
+        let exerciseState = null;
+        let pose = null;
+        let camera = null;
+        let frameLoopId = null;  // For manual frame loop when camera switching
+        let startTime = null;
+        let statusPollInterval = null;
+        let isQuickMode = new URLSearchParams(window.location.search).get('quick') === 'true';
+        let selectedCameraId = localStorage.getItem('vibereps-camera') || '';
+        let completedExercises = new Set();  // Track exercises done this session
+        let totalRepsThisSession = 0;        // Total reps across all exercises
+
+        // Detection state (baselines, history)
+        let detectionState = {};
+
+        // ============================================
+        // Load exercises from server
+        // ============================================
+        async function loadExercises() {
+            try {
+                const response = await fetch('/exercises');
+                const exerciseList = await response.json();
+
+const selector = document.getElementById('exerciseSelector');
+                selector.innerHTML = '';
+
+                for (const ex of exerciseList) {
+                    exercises[ex.id] = ex;
+
+                    // Load full config
+                    try {
+                        const configResponse = await fetch(`/exercises/${ex.file}`);
+                        exerciseConfigs[ex.id] = await configResponse.json();
+                    } catch (e) {
+                        console.warn(`Failed to load config for ${ex.id}:`, e);
+                    }
+
+                    // Create button
+                    const btn = document.createElement('button');
+                    btn.id = `${ex.id}Btn`;
+                    btn.onclick = () => startWithStandUpCheck(ex.id);
+
+                    const reps = isQuickMode ? ex.reps.quick : ex.reps.normal;
+                    btn.innerHTML = `${ex.name} (<span class="rep-count">${reps}</span>)`;
+
+                    selector.appendChild(btn);
+                }
+
+                // Handle auto-start from exercises parameter
+                const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
+                if (exercisesParam) {
+                    const enabledExercises = exercisesParam.split(',').map(e => e.trim()).filter(e =>
+                        exercises[e]
+                    );
+                    if (enabledExercises.length > 0) {
+                        const randomExercise = enabledExercises[Math.floor(Math.random() * enabledExercises.length)];
+                        selector.style.display = 'none';
+                        document.getElementById('subtitle').textContent = `starting ${randomExercise.replace('_', ' ')}...`;
+                        setTimeout(() => startWithStandUpCheck(randomExercise), 500);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Failed to load exercises:', error);
+                document.getElementById('exerciseSelector').innerHTML =
+                    '<div class="loading">Failed to load exercises. Using defaults...</div>';
+                // Fall back to hardcoded exercises after a moment
+                setTimeout(loadFallbackExercises, 1000);
+            }
+        }
+
+        function loadFallbackExercises() {
+            // Fallback hardcoded exercises if server fails
+            const fallbackExercises = [
+                {id: 'squats', name: 'Squats', reps: {normal: 10, quick: 5}},
+                {id: 'jumping_jacks', name: 'Jumping Jacks', reps: {normal: 20, quick: 10}},
+                {id: 'high_knees', name: 'High Knees', reps: {normal: 20, quick: 10}}
+            ];
+
+            const selector = document.getElementById('exerciseSelector');
+            selector.innerHTML = '';
+
+            for (const ex of fallbackExercises) {
+                exercises[ex.id] = ex;
+                const btn = document.createElement('button');
+                btn.id = `${ex.id}Btn`;
+                btn.onclick = () => startWithStandUpCheck(ex.id);
+                const reps = isQuickMode ? ex.reps.quick : ex.reps.normal;
+                btn.innerHTML = `${ex.name} (<span class="rep-count">${reps}</span>)`;
+                selector.appendChild(btn);
+            }
+        }
+
+        // Update title for quick mode
+        if (isQuickMode) {
+            document.getElementById('title').textContent = 'vibereps --quick';
+            document.getElementById('subtitle').textContent = 'quick session while claude works';
+        }
+
+        // ============================================
+        // Stand-up detection
+        // ============================================
+        let standUpVerified = false;
+        let pendingExercise = null;
+
+        async function startWithStandUpCheck(exerciseId) {
+            pendingExercise = exerciseId;
+            standUpVerified = false;
+            currentExercise = '_standup_check';
+            repCount = 0;
+            exerciseState = 'checking';
+            startTime = Date.now();
+
+            document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = true);
+            document.getElementById('counter').textContent = '?';
+            document.getElementById('status').textContent = 'Stand up and step back so your full body is visible...';
+
+            try {
+                const video = document.getElementById('video');
+                const videoConstraints = {
+                    width: 320,
+                    height: 240
+                };
+                // Use selected camera if available
+                if (selectedCameraId) {
+                    videoConstraints.deviceId = { exact: selectedCameraId };
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints
+                });
+                video.srcObject = stream;
+                document.getElementById('videoContainer').classList.add('active');
+
+                if (!pose) {
+                    const success = await initPose();
+                    if (!success) return;
+                }
+
+                if (typeof Camera !== 'undefined') {
+                    camera = new Camera(video, {
+                        onFrame: async () => { await pose.send({image: video}); },
+                        width: 320,
+                        height: 240
+                    });
+                    await camera.start();
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+                document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = false);
+            }
+        }
+
+        function checkStandUp(landmarks) {
+            const nose = landmarks[0];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+            const leftAnkle = landmarks[27];
+            const rightAnkle = landmarks[28];
+
+            const allVisible = [nose, leftShoulder, rightShoulder, leftHip, rightHip, leftAnkle, rightAnkle]
+                .every(p => p && p.visibility > 0.5);
+
+            if (!allVisible) {
+                document.getElementById('status').textContent = 'Step back - need to see your full body (head to feet)';
+                return false;
+            }
+
+            const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+            const hipY = (leftHip.y + rightHip.y) / 2;
+            const ankleY = (leftAnkle.y + rightAnkle.y) / 2;
+
+            if (shoulderY < hipY && hipY < ankleY) {
+                document.getElementById('counter').textContent = '✓';
+                const exName = exercises[pendingExercise]?.name || pendingExercise;
+                document.getElementById('status').textContent = `Great! Starting ${exName}...`;
+                standUpVerified = true;
+
+                setTimeout(() => {
+                    currentExercise = pendingExercise;
+                    currentConfig = exerciseConfigs[pendingExercise];
+                    exerciseState = 'ready';
+                    repCount = 0;
+                    detectionState = {};  // Reset detection state
+                    document.getElementById('counter').textContent = '0';
+                }, 1000);
+                return true;
+            } else {
+                document.getElementById('status').textContent = 'Stand up straight facing the camera';
+                return false;
+            }
+        }
+
+        // ============================================
+        // MediaPipe initialization
+        // ============================================
+        async function initPose() {
+            if (typeof Pose === 'undefined') {
+                document.getElementById('status').textContent = 'Error: MediaPipe libraries not loaded';
+                return false;
+            }
+
+            pose = new Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                }
+            });
+
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            pose.onResults(onPoseResults);
+            return true;
+        }
+
+        function onPoseResults(results) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (results.poseLandmarks) {
+                detectExercise(results.poseLandmarks);
+
+                const accentColor = themeColors[currentTheme] || '#4ec9b0';
+                ctx.strokeStyle = accentColor;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = accentColor;
+                drawConnectors(ctx, results.poseLandmarks);
+
+                ctx.fillStyle = accentColor;
+                results.poseLandmarks.forEach(landmark => {
+                    ctx.beginPath();
+                    ctx.arc(landmark.x * 320, landmark.y * 240, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            }
+        }
+
+        // ============================================
+        // Generic Detection Engine
+        // ============================================
+        function detectExercise(landmarks) {
+            if (!currentExercise) return;
+
+            if (currentExercise === '_standup_check' && !standUpVerified) {
+                checkStandUp(landmarks);
+                return;
+            }
+
+            const config = currentConfig;
+            if (!config || !config.detection) {
+                // Fallback to legacy detection for exercises without config
+                detectLegacy(currentExercise, landmarks);
+                return;
+            }
+
+            const detection = config.detection;
+            const type = detection.type;
+
+            switch (type) {
+                case 'angle':
+                    detectAngle(landmarks, config);
+                    break;
+                case 'height_baseline':
+                    detectHeightBaseline(landmarks, config);
+                    break;
+                case 'height_relative':
+                    detectHeightRelative(landmarks, config);
+                    break;
+                case 'position_relative':
+                    detectPositionRelative(landmarks, config);
+                    break;
+                case 'position_baseline':
+                    detectPositionBaseline(landmarks, config);
+                    break;
+                case 'distance':
+                    detectDistance(landmarks, config);
+                    break;
+                case 'tilt':
+                    detectTilt(landmarks, config);
+                    break;
+                case 'width_ratio':
+                    detectWidthRatio(landmarks, config);
+                    break;
+                case 'quadrant_tracking':
+                    detectQuadrantTracking(landmarks, config);
+                    break;
+                default:
+                    detectLegacy(currentExercise, landmarks);
+            }
+        }
+
+// ============================================
+        // Detection Helpers
+        // ============================================
+
+        // Helper: Check if landmarks are visible enough
+        function isVisible(landmarks, indices, minConfidence = 0.5) {
+            return indices.every(i => landmarks[i] && landmarks[i].visibility > minConfidence);
+        }
+
+        // Helper: Get body scale for normalizing thresholds
+        function getBodyScale(landmarks) {
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+            if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) return 1;
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+            const torsoHeight = Math.abs((leftShoulder.y + rightShoulder.y) / 2 - (leftHip.y + rightHip.y) / 2);
+            return Math.max(shoulderWidth, torsoHeight, 0.1);
+        }
+
+        // Calf raise baseline (reset each rep)
+        let calfBaseline = null;
+
+        // ============================================
+        // Detection Type Implementations
+        // ============================================
+
+        function detectAngle(landmarks, config) {
+            const det = config.detection;
+            const joint = det.landmarks.joint;
+
+            // Check visibility of required landmarks
+            if (!isVisible(landmarks, joint, 0.5)) {
+                document.getElementById('status').textContent = 'Position yourself so joints are visible';
+                return;
+            }
+
+            // Use both sides if available for better accuracy
+            let angle;
+            if (det.landmarks.joint_alt) {
+                const jointAlt = det.landmarks.joint_alt;
+                if (isVisible(landmarks, jointAlt, 0.5)) {
+                    const leftAngle = calculateAngle(landmarks[joint[0]], landmarks[joint[1]], landmarks[joint[2]]);
+                    const rightAngle = calculateAngle(landmarks[jointAlt[0]], landmarks[jointAlt[1]], landmarks[jointAlt[2]]);
+                    angle = (leftAngle + rightAngle) / 2;
+                } else {
+                    angle = calculateAngle(landmarks[joint[0]], landmarks[joint[1]], landmarks[joint[2]]);
+                }
+            } else {
+                angle = calculateAngle(landmarks[joint[0]], landmarks[joint[1]], landmarks[joint[2]]);
+            }
+
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready' || exerciseState === 'up') {
+                statusEl.textContent = config.instructions?.ready?.replace('{down}', det.thresholds.down) ||
+                    `Angle: ${Math.round(angle)}° - Go below ${det.thresholds.down}°`;
+            }
+
+            if (angle < det.thresholds.down && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = config.instructions?.down || 'Good! Now come back up';
+            } else if (angle > det.thresholds.up && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectHeightBaseline(landmarks, config) {
+            const det = config.detection;
+            const primaryIds = det.landmarks.primary;
+
+            // Check visibility
+            if (!isVisible(landmarks, primaryIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position yourself so key points are visible';
+                return;
+            }
+
+            let avgY = 0;
+            for (const id of primaryIds) {
+                avgY += landmarks[id].y;
+            }
+            avgY /= primaryIds.length;
+
+            // Set baseline only on first frame (ready state)
+            if (exerciseState === 'ready') {
+                detectionState.baseline = avgY;
+                exerciseState = 'down';
+            }
+
+            // For calf raises, we need to factor in leg length
+            let threshold = det.thresholds.trigger;
+            if (det.baseline === 'leg_length_ratio' && det.landmarks.reference) {
+                const refIds = det.landmarks.reference;
+                if (!isVisible(landmarks, refIds, 0.5)) return;
+                let refY = 0;
+                for (const id of refIds) {
+                    refY += landmarks[id].y;
+                }
+                refY /= refIds.length;
+                const legLength = avgY - refY;
+                threshold = legLength * det.thresholds.trigger;
+            }
+
+            const lift = detectionState.baseline - avgY;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'down') {
+                statusEl.textContent = config.instructions?.ready || `Lift: ${(lift * 100).toFixed(1)}%`;
+            }
+
+            if (lift > threshold && exerciseState === 'down') {
+                exerciseState = 'up';
+                statusEl.textContent = config.instructions?.up || 'Hold! Now lower down';
+            } else if (lift < threshold * 0.3 && exerciseState === 'up') {
+                // Reset baseline when coming back down for next rep
+                detectionState.baseline = avgY;
+                exerciseState = 'down';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectHeightRelative(landmarks, config) {
+            const det = config.detection;
+            const targetIds = det.landmarks.target;
+            const refIds = det.landmarks.reference;
+
+            // Check visibility
+            if (!isVisible(landmarks, targetIds, 0.5) || !isVisible(landmarks, refIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your body in view';
+                return;
+            }
+
+            let targetY = Infinity;
+            for (const id of targetIds) {
+                if (det.mode === 'either') {
+                    targetY = Math.min(targetY, landmarks[id].y);
+                } else {
+                    targetY = (targetY === Infinity ? 0 : targetY) + landmarks[id].y;
+                }
+            }
+            if (det.mode !== 'either') targetY /= targetIds.length;
+
+            let refY = 0;
+            for (const id of refIds) {
+                refY += landmarks[id].y;
+            }
+            refY /= refIds.length;
+
+            const raised = refY - targetY > det.thresholds.trigger;
+            const statusEl = document.getElementById('status');
+
+            // Initialize to 'down' state for proper cycle counting
+            if (exerciseState === 'ready') exerciseState = 'down';
+
+            if (exerciseState === 'down') {
+                statusEl.textContent = config.instructions?.ready || 'Lift up!';
+            }
+
+            if (raised && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+                statusEl.textContent = config.instructions?.up || 'Good! Now lower';
+            } else if (!raised && exerciseState === 'up') {
+                exerciseState = 'down';
+            }
+        }
+
+        function detectPositionRelative(landmarks, config) {
+            const det = config.detection;
+            const targetIds = det.landmarks.target;
+            const refIds = det.landmarks.reference;
+
+            // Check visibility
+            if (!isVisible(landmarks, targetIds, 0.5) || !isVisible(landmarks, refIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your body in view';
+                return;
+            }
+
+            let allAbove = true;
+            for (let i = 0; i < targetIds.length; i++) {
+                const target = landmarks[targetIds[i]];
+                const ref = landmarks[refIds[i]];
+                if (target.y >= ref.y) allAbove = false;
+            }
+
+            const statusEl = document.getElementById('status');
+
+            // Initialize to 'down' for proper cycle
+            if (exerciseState === 'ready') exerciseState = 'down';
+
+            if (allAbove && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            } else if (!allAbove && exerciseState === 'up') {
+                exerciseState = 'down';
+                statusEl.textContent = config.instructions?.down || 'Jump again!';
+            }
+        }
+
+        function detectPositionBaseline(landmarks, config) {
+            const det = config.detection;
+            const targetId = det.landmarks.target[0];
+            const refIds = det.landmarks.reference;
+
+            // Check visibility
+            if (!isVisible(landmarks, [targetId], 0.5) || !isVisible(landmarks, refIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position yourself in view';
+                return;
+            }
+
+            const target = landmarks[targetId];
+
+            let refCenter = 0;
+            for (const id of refIds) {
+                refCenter += landmarks[id][det.axis];
+            }
+            refCenter /= refIds.length;
+
+            const distance = refCenter - target[det.axis];
+
+            if (!detectionState.baseline) {
+                detectionState.baseline = distance;
+            }
+
+            const movement = detectionState.baseline - distance;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready' || exerciseState === 'forward') {
+                statusEl.textContent = config.instructions?.ready || 'Move!';
+            }
+
+            if (movement > det.thresholds.trigger && exerciseState !== 'tucked') {
+                exerciseState = 'tucked';
+                statusEl.textContent = config.instructions?.tucked || 'Good! Hold briefly';
+            } else if (movement < det.thresholds.trigger * 0.3 && exerciseState === 'tucked') {
+                exerciseState = 'forward';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectDistance(landmarks, config) {
+            const det = config.detection;
+
+            // Collect all required landmark IDs
+            const requiredIds = [];
+            for (const pair of det.landmarks.pairs) {
+                requiredIds.push(pair.from, pair.to);
+            }
+
+            // Check visibility
+            if (!isVisible(landmarks, requiredIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your full body in view';
+                return;
+            }
+
+            // Normalize threshold to body scale
+            const bodyScale = getBodyScale(landmarks);
+            const threshold = det.thresholds.trigger * bodyScale;
+
+            let isCrunching = false;
+            let minDist = Infinity;
+
+            for (const pair of det.landmarks.pairs) {
+                const from = landmarks[pair.from];
+                const to = landmarks[pair.to];
+                const dist = Math.abs(from.y - to.y) + Math.abs(from.x - to.x);
+                minDist = Math.min(minDist, dist);
+                if (dist < threshold) {
+                    isCrunching = true;
+                    break;
+                }
+            }
+
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'up';
+
+            if (exerciseState === 'up') {
+                statusEl.textContent = config.instructions?.ready || `Bring elbow to knee! (dist: ${minDist.toFixed(2)})`;
+            }
+
+            if (isCrunching && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = config.instructions?.down || 'Good! Stand up straight';
+            } else if (!isCrunching && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectTilt(landmarks, config) {
+            const det = config.detection;
+            const upperIds = det.landmarks.upper;
+            const lowerIds = det.landmarks.lower;
+
+            // Check visibility
+            if (!isVisible(landmarks, upperIds, 0.5) || !isVisible(landmarks, lowerIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your torso in view';
+                return;
+            }
+
+            let upperX = 0, lowerX = 0;
+            for (const id of upperIds) {
+                upperX += landmarks[id].x;
+            }
+            upperX /= upperIds.length;
+
+            for (const id of lowerIds) {
+                lowerX += landmarks[id].x;
+            }
+            lowerX /= lowerIds.length;
+
+            // Normalize threshold to body scale
+            const bodyScale = getBodyScale(landmarks);
+            const threshold = det.thresholds.trigger * bodyScale;
+
+            const tilt = upperX - lowerX;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'center';
+
+            if (exerciseState === 'center') {
+                statusEl.textContent = config.instructions?.ready || `Lean to one side! (tilt: ${(tilt / bodyScale * 100).toFixed(0)}%)`;
+            }
+
+            if (Math.abs(tilt) > threshold && exerciseState !== 'side') {
+                exerciseState = 'side';
+                const dir = tilt > 0 ? 'right' : 'left';
+                statusEl.textContent = config.instructions?.side?.replace('{direction}', dir) ||
+                    `Good stretch ${dir}! Return to center`;
+            } else if (Math.abs(tilt) < threshold * 0.4 && exerciseState === 'side') {
+                exerciseState = 'center';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectWidthRatio(landmarks, config) {
+            const det = config.detection;
+            const upperIds = det.landmarks.upper;
+            const lowerIds = det.landmarks.lower;
+
+            // Check visibility
+            if (!isVisible(landmarks, upperIds, 0.5) || !isVisible(landmarks, lowerIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your body in view';
+                return;
+            }
+
+            const upperWidth = Math.abs(landmarks[upperIds[1]].x - landmarks[upperIds[0]].x);
+            const lowerWidth = Math.abs(landmarks[lowerIds[1]].x - landmarks[lowerIds[0]].x);
+
+            const ratio = upperWidth / lowerWidth;
+
+            if (!detectionState.baseline) {
+                detectionState.baseline = ratio;
+            }
+
+            const twistAmount = detectionState.baseline - ratio;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready' || exerciseState === 'center') {
+                statusEl.textContent = config.instructions?.ready?.replace('{twist}', (twistAmount * 100).toFixed(0)) ||
+                    `Twist: ${(twistAmount * 100).toFixed(0)}%`;
+            }
+
+            if (twistAmount > det.thresholds.trigger && exerciseState !== 'twisted') {
+                exerciseState = 'twisted';
+                statusEl.textContent = config.instructions?.twisted || 'Good twist! Return to center';
+            } else if (twistAmount < det.thresholds.trigger * 0.3 && exerciseState === 'twisted') {
+                exerciseState = 'center';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectQuadrantTracking(landmarks, config) {
+            const det = config.detection;
+            const wristIds = det.landmarks.wrist;
+            const shoulderIds = det.landmarks.shoulder;
+
+            // Check visibility
+            if (!isVisible(landmarks, wristIds, 0.5) || !isVisible(landmarks, shoulderIds, 0.5)) {
+                document.getElementById('status').textContent = 'Position your arms in view';
+                return;
+            }
+
+            // Use higher wrist
+            const wrist = landmarks[wristIds[0]].y < landmarks[wristIds[1]].y ?
+                landmarks[wristIds[0]] : landmarks[wristIds[1]];
+            const shoulder = landmarks[wristIds[0]].y < landmarks[wristIds[1]].y ?
+                landmarks[shoulderIds[0]] : landmarks[shoulderIds[1]];
+
+            const relX = wrist.x - shoulder.x;
+            const relY = wrist.y - shoulder.y;
+            const angle = Math.atan2(relY, relX) * 180 / Math.PI;
+
+            if (!detectionState.history) detectionState.history = [];
+            detectionState.history.push(angle);
+            if (detectionState.history.length > (det.historyLength || 30)) {
+                detectionState.history.shift();
+            }
+
+            const statusEl = document.getElementById('status');
+
+            if (detectionState.history.length >= (det.minHistoryForDetection || 20)) {
+                const hasTop = detectionState.history.some(a => a < -45 && a > -135);
+                const hasBottom = detectionState.history.some(a => a > 45 && a < 135);
+                const hasLeft = detectionState.history.some(a => Math.abs(a) > 135);
+                const hasRight = detectionState.history.some(a => Math.abs(a) < 45);
+
+                if (hasTop && hasBottom && hasLeft && hasRight && exerciseState !== 'complete') {
+                    exerciseState = 'complete';
+                    repCount++;
+                    detectionState.history = [];
+                    updateCounter();
+                }
+
+                statusEl.textContent = config.instructions?.circling?.replace('{angle}', Math.round(angle)) ||
+                    `Make big circles! Angle: ${Math.round(angle)}°`;
+            } else {
+                statusEl.textContent = config.instructions?.ready || 'Extend arms and make big circles!';
+                exerciseState = 'ready';
+            }
+        }
+
+        // ============================================
+        // Legacy detection for exercises without JSON config
+        // ============================================
+        function detectLegacy(exerciseId, landmarks) {
+            switch (exerciseId) {
+                case 'squats':
+                    detectLegacySquat(landmarks);
+                    break;
+                case 'pushups':
+                    detectLegacyPushup(landmarks);
+                    break;
+                case 'jumping_jacks':
+                    detectLegacyJumpingJack(landmarks);
+                    break;
+                case 'standing_crunches':
+                    detectLegacyStandingCrunch(landmarks);
+                    break;
+                case 'calf_raises':
+                    detectLegacyCalfRaise(landmarks);
+                    break;
+                case 'side_stretches':
+                    detectLegacySideStretch(landmarks);
+                    break;
+                default:
+                    document.getElementById('status').textContent = `Performing ${exerciseId}...`;
+            }
+        }
+
+        function detectLegacySquat(landmarks) {
+            const DOWN_ANGLE = 120;
+            const UP_ANGLE = 150;
+
+            if (!isVisible(landmarks, [23, 24, 25, 26, 27, 28], 0.5)) {
+                document.getElementById('status').textContent = 'Position your legs in view';
+                return;
+            }
+
+            const leftAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+            const rightAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+            const angle = (leftAngle + rightAngle) / 2;
+
+            const statusEl = document.getElementById('status');
+            if (exerciseState === 'ready' || exerciseState === 'up') {
+                statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Squat down below ${DOWN_ANGLE}°`;
+            } else if (exerciseState === 'down') {
+                statusEl.textContent = `Knee angle: ${Math.round(angle)}° - Stand up above ${UP_ANGLE}°`;
+            }
+
+            if (angle < DOWN_ANGLE && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = `Good depth! Now stand up (${Math.round(angle)}°)`;
+            } else if (angle > UP_ANGLE && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectLegacyPushup(landmarks) {
+            const DOWN_ANGLE = 90;
+            const UP_ANGLE = 150;
+
+            if (!isVisible(landmarks, [11, 12, 13, 14, 15, 16], 0.5)) {
+                document.getElementById('status').textContent = 'Position your arms in view';
+                return;
+            }
+
+            const leftAngle = calculateAngle(landmarks[11], landmarks[13], landmarks[15]);
+            const rightAngle = calculateAngle(landmarks[12], landmarks[14], landmarks[16]);
+            const angle = (leftAngle + rightAngle) / 2;
+
+            const statusEl = document.getElementById('status');
+            if (exerciseState === 'ready' || exerciseState === 'up') {
+                statusEl.textContent = `Elbow angle: ${Math.round(angle)}° - Go down below ${DOWN_ANGLE}°`;
+            } else if (exerciseState === 'down') {
+                statusEl.textContent = `Elbow angle: ${Math.round(angle)}° - Push up above ${UP_ANGLE}°`;
+            }
+
+            if (angle < DOWN_ANGLE && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = `Good! Now push up (${Math.round(angle)}°)`;
+            } else if (angle > UP_ANGLE && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectLegacyJumpingJack(landmarks) {
+            if (!isVisible(landmarks, [11, 12, 15, 16], 0.5)) {
+                document.getElementById('status').textContent = 'Position your arms in view';
+                return;
+            }
+
+            const leftWrist = landmarks[15];
+            const rightWrist = landmarks[16];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+
+            const armsUp = leftWrist.y < leftShoulder.y && rightWrist.y < rightShoulder.y;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'down';
+
+            if (armsUp && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+                statusEl.textContent = 'Arms up! Now bring them down';
+            } else if (!armsUp && exerciseState === 'up') {
+                exerciseState = 'down';
+                statusEl.textContent = 'Good! Raise arms above shoulders';
+            } else if (!armsUp && exerciseState === 'down') {
+                statusEl.textContent = 'Raise arms above shoulders!';
+            }
+        }
+
+        function detectLegacyStandingCrunch(landmarks) {
+            if (!isVisible(landmarks, [13, 14, 23, 24, 25, 26], 0.5)) {
+                document.getElementById('status').textContent = 'Position your full body in view';
+                return;
+            }
+
+            const leftElbow = landmarks[13];
+            const rightElbow = landmarks[14];
+            const leftKnee = landmarks[25];
+            const rightKnee = landmarks[26];
+
+            const bodyScale = getBodyScale(landmarks);
+            const crunchThreshold = bodyScale * 1.2;
+
+            const leftToRight = Math.abs(leftElbow.y - rightKnee.y) + Math.abs(leftElbow.x - rightKnee.x);
+            const rightToLeft = Math.abs(rightElbow.y - leftKnee.y) + Math.abs(rightElbow.x - leftKnee.x);
+            const minDist = Math.min(leftToRight, rightToLeft);
+
+            const isCrunching = minDist < crunchThreshold;
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'up';
+
+            if (exerciseState === 'up') {
+                statusEl.textContent = `Bring elbow to opposite knee! (dist: ${minDist.toFixed(2)})`;
+            }
+
+            if (isCrunching && exerciseState !== 'down') {
+                exerciseState = 'down';
+                statusEl.textContent = 'Good crunch! Now stand up straight';
+            } else if (!isCrunching && exerciseState === 'down') {
+                exerciseState = 'up';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectLegacyCalfRaise(landmarks) {
+            if (!isVisible(landmarks, [23, 24, 27, 28], 0.5)) {
+                document.getElementById('status').textContent = 'Position your legs in view';
+                return;
+            }
+
+            const leftAnkle = landmarks[27];
+            const rightAnkle = landmarks[28];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+
+            const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
+            const avgHipY = (leftHip.y + rightHip.y) / 2;
+            const legLength = avgAnkleY - avgHipY;
+
+            if (exerciseState === 'ready' || exerciseState === 'down') {
+                calfBaseline = avgAnkleY;
+            }
+
+            const lift = calfBaseline - avgAnkleY;
+            const liftThreshold = legLength * 0.04;
+            const liftPercent = (lift / legLength * 100).toFixed(0);
+
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'down';
+
+            if (exerciseState === 'down') {
+                statusEl.textContent = `Rise up on your toes! (lift: ${liftPercent}%)`;
+            }
+
+            if (lift > liftThreshold && exerciseState === 'down') {
+                exerciseState = 'up';
+                statusEl.textContent = `Hold it! Now lower down (lift: ${liftPercent}%)`;
+            } else if (lift < liftThreshold * 0.3 && exerciseState === 'up') {
+                exerciseState = 'down';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        function detectLegacySideStretch(landmarks) {
+            if (!isVisible(landmarks, [11, 12, 23, 24], 0.5)) {
+                document.getElementById('status').textContent = 'Position your torso in view';
+                return;
+            }
+
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+
+            const bodyScale = getBodyScale(landmarks);
+            const tiltThreshold = bodyScale * 0.4;
+
+            const shoulderCenter = (leftShoulder.x + rightShoulder.x) / 2;
+            const hipCenter = (leftHip.x + rightHip.x) / 2;
+            const tilt = shoulderCenter - hipCenter;
+
+            const statusEl = document.getElementById('status');
+
+            if (exerciseState === 'ready') exerciseState = 'center';
+
+            if (exerciseState === 'center') {
+                statusEl.textContent = `Lean to one side! (tilt: ${(tilt / bodyScale * 100).toFixed(0)}%)`;
+            }
+
+            if (Math.abs(tilt) > tiltThreshold && exerciseState !== 'side') {
+                exerciseState = 'side';
+                const direction = tilt > 0 ? 'right' : 'left';
+                statusEl.textContent = `Good stretch ${direction}! Now come back to center`;
+            } else if (Math.abs(tilt) < tiltThreshold * 0.4 && exerciseState === 'side') {
+                exerciseState = 'center';
+                repCount++;
+                updateCounter();
+            }
+        }
+
+        // ============================================
+        // Utility functions
+        // ============================================
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
+
+        function drawConnectors(ctx, landmarks) {
+            const connections = [
+                [11, 13], [13, 15], [12, 14], [14, 16],
+                [11, 23], [12, 24], [23, 25], [25, 27],
+                [24, 26], [26, 28], [11, 12], [23, 24],
+            ];
+
+            connections.forEach(([start, end]) => {
+                if (landmarks[start] && landmarks[end]) {
+                    ctx.beginPath();
+                    ctx.moveTo(landmarks[start].x * 320, landmarks[start].y * 240);
+                    ctx.lineTo(landmarks[end].x * 320, landmarks[end].y * 240);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function getTargetReps() {
+            if (!currentExercise || !exercises[currentExercise]) return 10;
+            const reps = exercises[currentExercise].reps;
+            return isQuickMode ? reps.quick : reps.normal;
+        }
+
+        function updateCounter() {
+            document.getElementById('counter').textContent = repCount;
+            const target = getTargetReps();
+
+            if (repCount >= target) {
+                // Track completed exercise
+                totalRepsThisSession += repCount;
+                completedExercises.add(currentExercise);
+
+                document.getElementById('status').textContent = '🎉 Great job! Exercise complete!';
+
+                if (camera) camera.stop();
+                if (frameLoopId) {
+                    cancelAnimationFrame(frameLoopId);
+                    frameLoopId = null;
+                }
+                const video = document.getElementById('video');
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                document.getElementById('videoContainer').classList.remove('active');
+
+                if (isQuickMode) {
+                    // Check if Claude is done before deciding next action
+                    setTimeout(() => checkAndContinueOrFinish(), 1500);
+                } else {
+                    setTimeout(() => {
+                        document.querySelectorAll('.exercise-selector button').forEach(btn => {
+                            btn.disabled = false;
+                            btn.classList.remove('active');
+                        });
+                        exerciseState = null;
+                        document.getElementById('status').textContent = 'Great work! Pick another exercise or finish session.';
+                    }, 2000);
+                }
+            } else {
+                const remaining = target - repCount;
+                document.getElementById('status').textContent = `Keep going! ${remaining} more! 💪`;
+            }
+        }
+
+        // Check if Claude is done, continue with new exercise or finish
+        async function checkAndContinueOrFinish() {
+            try {
+                const response = await fetch('/status');
+                const status = await response.json();
+
+                if (status.claude_complete) {
+                    // Claude is done! Show completion
+                    showClaudeCompleteNotification();
+                } else {
+                    // Claude still working - pick another exercise!
+                    const nextExercise = pickNextExercise();
+                    if (nextExercise) {
+                        const exName = exercises[nextExercise].name;
+                        document.getElementById('subtitle').textContent = `starting ${exName.toLowerCase()}...`;
+                        document.getElementById('status').textContent = `Nice! ${exName} next...`;
+                        setTimeout(() => {
+                            startWithStandUpCheck(nextExercise);
+                        }, 1000);
+                    } else {
+                        // No more exercises available, wait for Claude
+                        document.getElementById('status').textContent = '⏳ All exercises done! Waiting for Claude...';
+                        document.getElementById('exerciseSelector').style.display = 'none';
+                        document.querySelector('.finish-btn').textContent = 'Waiting for Claude...';
+                        document.querySelector('.finish-btn').disabled = true;
+                        startStatusPolling();
+                    }
+                }
+            } catch (e) {
+                // If status check fails, just wait for Claude
+                document.getElementById('status').textContent = '⏳ Claude is working on your request...';
+                startStatusPolling();
+            }
+        }
+
+        // Pick the next exercise (one we haven't done yet)
+        function pickNextExercise() {
+            const available = Object.keys(exercises).filter(id =>
+                !id.startsWith('_') && !completedExercises.has(id)
+            );
+            if (available.length === 0) {
+                // All exercises done - reset and cycle through again
+                completedExercises.clear();
+                const allExercises = Object.keys(exercises).filter(id => !id.startsWith('_'));
+                if (allExercises.length === 0) return null;
+                return allExercises[Math.floor(Math.random() * allExercises.length)];
+            }
+            return available[Math.floor(Math.random() * available.length)];
+        }
+
+        // ============================================
+        // Status polling for quick mode
+        // ============================================
+        function startStatusPolling() {
+            if (statusPollInterval) return;
+
+            statusPollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/status');
+                    const status = await response.json();
+
+                    if (status.claude_complete) {
+                        clearInterval(statusPollInterval);
+                        showClaudeCompleteNotification();
+                    }
+                } catch (error) {
+                    console.error('Status poll error:', error);
+                }
+            }, 1000);
+        }
+
+        function showClaudeCompleteNotification() {
+            document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
+            document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
+            document.querySelector('.finish-btn').disabled = false;
+            document.querySelector('.finish-btn').onclick = () => window.close();
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Claude Code Ready!', {
+                    body: 'Your request is complete. Check Claude Code!',
+                    icon: '🤖'
+                });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Claude Code Ready!', {
+                            body: 'Your request is complete. Check Claude Code!',
+                            icon: '🤖'
+                        });
+                    }
+                });
+            }
+
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiDYIGGS46ummTgwNUKzn8LdmHAU9kdz0y3krBSp+zPLaizsKE1+36eyrWRIJSKHh87ljHgU2fcrx24k4ChdbsuXqpVELDFCt5++8aB8GOpHb9Ml5KwUlfcry2I89ChNguuvrs1kSCUuf4PPAaCAGN4HL8tyJNwoZZbjo6qZPDA5RruXwvGgfBTyS2/fLeSsGKX/L8tqLOwoSX7Tl6qxZEwlHoOHz');
+                audio.play().catch(() => {});
+            } catch (e) {}
+        }
+
+        // ============================================
+        // Session management
+        // ============================================
+        function finishSession() {
+            const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+
+            fetch('/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    completed: true,
+                    reps: repCount,
+                    exercise: currentExercise,
+                    duration: duration
+                })
+            }).then(() => {
+                document.getElementById('status').textContent = '✅ Session logged! You can close this window.';
+                setTimeout(() => window.close(), 2000);
+            }).catch(err => {
+                console.error('Error logging session:', err);
+                document.getElementById('status').textContent = 'Session complete! You can close this window.';
+            });
+        }
+
+        // ============================================
+        // Camera selection
+        // ============================================
+        async function enumerateCameras() {
+            const select = document.getElementById('cameraSelect');
+            const status = document.getElementById('camStatus');
+
+            try {
+                // Need to request permission first to get device labels
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(d => d.kind === 'videoinput');
+
+                select.innerHTML = '';
+
+                if (cameras.length === 0) {
+                    select.innerHTML = '<option value="">no cameras found</option>';
+                    status.textContent = '✗';
+                    status.className = 'cam-status error';
+                    return;
+                }
+
+                cameras.forEach((cam, i) => {
+                    const option = document.createElement('option');
+                    option.value = cam.deviceId;
+                    // Truncate long names, show index
+                    const label = cam.label || `Camera ${i + 1}`;
+                    option.textContent = label.length > 30 ? label.substring(0, 27) + '...' : label;
+                    option.title = label; // Full name on hover
+                    select.appendChild(option);
+                });
+
+                // Restore previous selection if still available
+                if (selectedCameraId && cameras.some(c => c.deviceId === selectedCameraId)) {
+                    select.value = selectedCameraId;
+                } else {
+                    selectedCameraId = cameras[0].deviceId;
+                    select.value = selectedCameraId;
+                }
+
+                status.textContent = `✓ ${cameras.length}`;
+                status.className = 'cam-status';
+
+            } catch (err) {
+                select.innerHTML = '<option value="">permission denied</option>';
+                status.textContent = '✗';
+                status.className = 'cam-status error';
+            }
+        }
+
+        async function switchCamera(deviceId) {
+            const video = document.getElementById('video');
+            const status = document.getElementById('camStatus');
+
+            // Stop existing stream if any
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            // Stop MediaPipe camera (it would override our stream)
+            if (camera) {
+                camera.stop();
+                camera = null;
+            }
+            // Cancel any existing manual frame loop
+            if (frameLoopId) {
+                cancelAnimationFrame(frameLoopId);
+                frameLoopId = null;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: 320,
+                        height: 240,
+                        deviceId: { exact: deviceId }
+                    }
+                });
+                video.srcObject = stream;
+
+                // Use manual frame loop instead of MediaPipe Camera class
+                // (Camera class calls getUserMedia internally and ignores our deviceId)
+                if (pose) {
+                    const sendFrame = async () => {
+                        if (video.readyState >= 2) {
+                            await pose.send({image: video});
+                        }
+                        frameLoopId = requestAnimationFrame(sendFrame);
+                    };
+                    frameLoopId = requestAnimationFrame(sendFrame);
+                }
+
+                status.textContent = '✓ switched';
+                status.className = 'cam-status';
+
+            } catch (err) {
+                status.textContent = '✗ failed';
+                status.className = 'cam-status error';
+            }
+        }
+
+        document.getElementById('cameraSelect').addEventListener('change', async (e) => {
+            selectedCameraId = e.target.value;
+            localStorage.setItem('vibereps-camera', selectedCameraId);
+
+            // If video is currently active, switch immediately
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                await switchCamera(selectedCameraId);
+            } else {
+                document.getElementById('camStatus').textContent = '✓ saved';
+            }
+
+            // Reset status after a moment
+            setTimeout(() => {
+                const cameras = document.getElementById('cameraSelect').options.length;
+                document.getElementById('camStatus').textContent = `✓ ${cameras}`;
+            }, 2000);
+        });
+
+        // ============================================
+        // Initialize on page load
+        // ============================================
+        enumerateCameras();
+        loadExercises();
+    </script>
+</body>
+</html>
