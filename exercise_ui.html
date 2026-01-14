@@ -370,10 +370,9 @@
         .exercise-toggle-btn:hover {
             color: var(--accent);
             opacity: 1;
-            transform: rotate(45deg);
         }
-        .exercise-toggle-btn:active {
-            transform: rotate(180deg);
+        .exercise-toggle-btn.open {
+            transform: scaleY(-1);
         }
         /* Dropdown for exercise selection */
         .exercise-dropdown {
@@ -453,7 +452,7 @@
         <div class="exercise-toggle" id="exerciseToggle">
             <div class="exercise-dropdown">
                 <span class="exercise-toggle-name" id="exerciseToggleName">squats</span>
-                <button class="exercise-toggle-btn" id="exerciseToggleBtn" title="Change exercise">⟳</button>
+                <button class="exercise-toggle-btn" id="exerciseToggleBtn" title="Change exercise">▾</button>
                 <div class="exercise-dropdown-menu" id="exerciseDropdown"></div>
             </div>
         </div>
@@ -1955,11 +1954,14 @@ const selector = document.getElementById('exerciseSelector');
 
         function toggleExerciseDropdown() {
             const dropdown = document.getElementById('exerciseDropdown');
+            const btn = document.getElementById('exerciseToggleBtn');
             dropdown.classList.toggle('open');
+            btn.classList.toggle('open');
         }
 
         function closeExerciseDropdown() {
             document.getElementById('exerciseDropdown').classList.remove('open');
+            document.getElementById('exerciseToggleBtn').classList.remove('open');
         }
 
         function switchExercise(newExerciseId) {
