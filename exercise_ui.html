@@ -296,6 +296,42 @@
         .camera-selector .cam-status.error {
             color: var(--warn);
         }
+        /* Claude context display */
+        .claude-context {
+            margin: 8px 0;
+            padding: 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            font-size: 11px;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+        .claude-context .context-header {
+            color: var(--accent);
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        .claude-context .context-summary {
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .claude-context .context-activity {
+            color: var(--text-dim);
+            font-size: 10px;
+        }
+        .claude-context .context-activity .activity-item {
+            display: flex;
+            gap: 4px;
+            margin: 2px 0;
+        }
+        .claude-context .context-activity .tool-badge {
+            color: var(--warn);
+            min-width: 50px;
+        }
+        .claude-context:empty {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -312,6 +348,8 @@
         </div>
         <h1 id="title">vibereps</h1>
         <p class="subtitle" id="subtitle">time to move</p>
+
+        <div class="claude-context" id="claudeContext"></div>
 
         <div class="camera-selector" id="cameraSelector">
             <label>cam:</label>
@@ -1475,7 +1513,27 @@ const selector = document.getElementById('exerciseSelector');
             }, 1000);
         }
 
-        function showClaudeCompleteNotification() {
+        async function showClaudeCompleteNotification() {
+            // Fetch updated context to show what Claude completed
+            try {
+                const response = await fetch('/context');
+                const context = await response.json();
+
+                // Update the context display with completion info
+                const container = document.getElementById('claudeContext');
+                let html = '<div class="context-header">Claude finished!</div>';
+
+                if (context.notification) {
+                    html += `<div class="context-summary">${escapeHtml(context.notification)}</div>`;
+                } else if (context.summary) {
+                    html += `<div class="context-summary">${escapeHtml(context.summary)}</div>`;
+                }
+
+                container.innerHTML = html;
+            } catch (e) {
+                // Context not available, just show generic message
+            }
+
             document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
             document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
             document.querySelector('.finish-btn').disabled = false;
@@ -1649,8 +1707,56 @@ const selector = document.getElementById('exerciseSelector');
         });
 
         // ============================================
+        // Claude context display
+        // ============================================
+        async function loadClaudeContext() {
+            try {
+                const response = await fetch('/context');
+                const context = await response.json();
+
+                const container = document.getElementById('claudeContext');
+                if (!context || (!context.summary && (!context.recent_activity || context.recent_activity.length === 0))) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                let html = '<div class="context-header">Claude is working...</div>';
+
+                if (context.summary) {
+                    html += `<div class="context-summary">${escapeHtml(context.summary)}</div>`;
+                }
+
+                if (context.recent_activity && context.recent_activity.length > 0) {
+                    html += '<div class="context-activity">';
+                    // Show last 3 activities
+                    const activities = context.recent_activity.slice(-3);
+                    for (const activity of activities) {
+                        const toolBadge = activity.tool === 'thinking' ? '>' : `[${activity.tool}]`;
+                        html += `<div class="activity-item">
+                            <span class="tool-badge">${escapeHtml(toolBadge)}</span>
+                            <span>${escapeHtml(activity.description || '')}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                }
+
+                container.innerHTML = html;
+            } catch (e) {
+                // Context not available, hide the section
+                document.getElementById('claudeContext').innerHTML = '';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ============================================
         // Initialize on page load
         // ============================================
+        loadClaudeContext();
         enumerateCameras();
         loadExercises();
     </script>

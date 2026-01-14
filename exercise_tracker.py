@@ -211,6 +211,112 @@ def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
         return False
 
 
+def extract_context_from_hook(hook_data: dict) -> dict:
+    """Extract useful context from Claude Code hook payload."""
+    context = {
+        "source": "hook",
+        "tool_name": hook_data.get("tool_name"),
+        "hook_event": hook_data.get("hook_event_name"),
+        "cwd": hook_data.get("cwd"),
+        "files_modified": [],
+        "summary": None,
+        "recent_activity": []
+    }
+
+    # Extract file info from tool_input
+    tool_input = hook_data.get("tool_input", {})
+    if isinstance(tool_input, dict):
+        file_path = tool_input.get("file_path") or tool_input.get("path")
+        if file_path:
+            # Get just the filename for display
+            context["files_modified"].append(Path(file_path).name)
+            context["summary"] = f"Edited {Path(file_path).name}"
+
+        # For Bash tool, show the command
+        command = tool_input.get("command")
+        if command and context["tool_name"] == "Bash":
+            # Truncate long commands
+            cmd_display = command[:50] + "..." if len(command) > 50 else command
+            context["summary"] = f"Ran: {cmd_display}"
+
+    return context
+
+
+def parse_transcript_for_context(transcript_path: str, max_entries: int = 5) -> list:
+    """Parse Claude Code transcript file to get recent activity."""
+    recent_activity = []
+
+    if not transcript_path or not Path(transcript_path).exists():
+        return recent_activity
+
+    try:
+        with open(transcript_path, 'r') as f:
+            lines = f.readlines()
+
+        # Parse last N lines (JSONL format)
+        for line in lines[-max_entries * 3:]:  # Read extra to account for non-tool entries
+            try:
+                entry = json.loads(line.strip())
+
+                # Look for tool use entries
+                if entry.get("type") == "tool_use":
+                    tool_name = entry.get("name", "unknown")
+                    tool_input = entry.get("input", {})
+
+                    activity = {"tool": tool_name}
+
+                    # Extract relevant info based on tool type
+                    if tool_name in ("Write", "Edit"):
+                        file_path = tool_input.get("file_path", "")
+                        activity["description"] = f"Edited {Path(file_path).name}" if file_path else "Edited file"
+                    elif tool_name == "Bash":
+                        cmd = tool_input.get("command", "")[:40]
+                        activity["description"] = f"Ran: {cmd}"
+                    elif tool_name == "Read":
+                        file_path = tool_input.get("file_path", "")
+                        activity["description"] = f"Read {Path(file_path).name}" if file_path else "Read file"
+                    elif tool_name in ("Glob", "Grep"):
+                        pattern = tool_input.get("pattern", "")[:30]
+                        activity["description"] = f"Searched: {pattern}"
+                    else:
+                        activity["description"] = f"Used {tool_name}"
+
+                    recent_activity.append(activity)
+
+                # Look for assistant messages to understand intent
+                elif entry.get("type") == "assistant" and entry.get("message"):
+                    msg = entry.get("message", {})
+                    if isinstance(msg, dict):
+                        content = msg.get("content", "")
+                        if isinstance(content, str) and len(content) > 10:
+                            # First 100 chars of what Claude said
+                            recent_activity.append({
+                                "tool": "thinking",
+                                "description": content[:100] + "..." if len(content) > 100 else content
+                            })
+
+            except json.JSONDecodeError:
+                continue
+
+        # Return most recent entries
+        return recent_activity[-max_entries:]
+
+    except Exception:
+        return recent_activity
+
+
+def build_claude_context(hook_data: dict) -> dict:
+    """Build complete context from hook payload and transcript."""
+    context = extract_context_from_hook(hook_data)
+
+    # Add transcript context if available
+    transcript_path = hook_data.get("transcript_path")
+    if transcript_path:
+        context["recent_activity"] = parse_transcript_for_context(transcript_path)
+
+    return context
+
+
 class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     """Custom HTTP handler to serve the exercise UI and handle completion"""
 
@@ -218,6 +324,7 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     completion_data = {}
     claude_complete = False
     quick_mode = False
+    claude_context = {}  # What Claude is working on (from hook payload + transcript)
 
     def do_GET(self):
         """Serve the exercise tracker HTML and exercise definitions"""
@@ -264,6 +371,13 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(exercise_content.encode())
             else:
                 self.send_error(404, f"Exercise file not found: {filename}")
+        elif parsed_path == '/context':
+            # Serve Claude context (what Claude is working on)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(ExerciseHTTPHandler.claude_context).encode())
         else:
             self.send_error(404)
 
@@ -300,6 +414,15 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
         elif self.path == '/notify':
             # Notification from Claude that it's done
             try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length)
+                    notify_data = json.loads(post_data.decode())
+                    # Update context with notification info
+                    if notify_data.get("message"):
+                        ExerciseHTTPHandler.claude_context["notification"] = notify_data.get("message")
+                        ExerciseHTTPHandler.claude_context["notification_type"] = notify_data.get("notification_type")
+
                 ExerciseHTTPHandler.claude_complete = True
 
                 self.send_response(200)
@@ -523,9 +646,32 @@ class ExerciseTrackerHook:
         return {"status": "skipped", "message": f"Event type {event_type} not handled"}
 
 
+CONTEXT_FILE = Path("/tmp/vibereps-context.json")
+
+
+def read_hook_payload_from_stdin() -> dict:
+    """Read Claude Code hook payload from stdin (non-blocking)."""
+    import select
+
+    # Check if there's data on stdin (non-blocking)
+    if select.select([sys.stdin], [], [], 0.1)[0]:
+        try:
+            return json.load(sys.stdin)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return {}
+
+
 def main():
     # Check if running as daemon
     if len(sys.argv) > 1 and sys.argv[1] == "--daemon":
+        # Load context from temp file (written by parent process)
+        if CONTEXT_FILE.exists():
+            try:
+                ExerciseHTTPHandler.claude_context = json.loads(CONTEXT_FILE.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
+
         # Run server in daemon mode
         tracker = ExerciseTrackerHook()
         tracker.run_server_daemon(quick_mode=True)
@@ -534,15 +680,27 @@ def main():
     # Parse Claude Code hook event
     if len(sys.argv) > 1:
         event_type = sys.argv[1]
-        data = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
+        # Command line arg is usually '{}', real data comes from stdin
+        _ = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
     else:
         # Test mode
         event_type = "post_tool_use"
-        data = {}
+
+    # Read actual hook payload from stdin (Claude Code passes it there)
+    hook_data = read_hook_payload_from_stdin()
+
+    # Build context from hook payload + transcript
+    if hook_data:
+        context = build_claude_context(hook_data)
+        # Write context to temp file for daemon to read
+        try:
+            CONTEXT_FILE.write_text(json.dumps(context))
+        except OSError:
+            pass
 
     # Initialize and run tracker
     tracker = ExerciseTrackerHook()
-    result = tracker.handle_hook(event_type, data)
+    result = tracker.handle_hook(event_type, hook_data)
 
     print(json.dumps(result))
     return 0 if result["status"] == "success" else 1
