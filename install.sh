@@ -21,9 +21,9 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 # Default install location
 INSTALL_DIR="${VIBEREPS_INSTALL_DIR:-$HOME/.vibereps}"
 SETTINGS_FILE="$HOME/.claude/settings.json"
-REPO_URL="https://github.com/Flow-Club/vibereps.git"
+RELEASE_URL="https://github.com/Flow-Club/vibereps/releases/latest/download/vibereps.tar.gz"
 
-# Check if we're running from an existing clone
+# Check if we're running from an existing clone/dev install
 detect_local_install() {
     if [[ -f "$(dirname "${BASH_SOURCE[0]}")/exercise_tracker.py" ]]; then
         INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,14 +35,37 @@ detect_local_install() {
 # Install or update vibereps
 install_vibereps() {
     if detect_local_install; then
-        print_step "Using existing installation at $INSTALL_DIR"
-    elif [[ -d "$INSTALL_DIR" ]]; then
-        print_step "Updating existing installation at $INSTALL_DIR"
-        cd "$INSTALL_DIR"
-        git pull origin main 2>/dev/null || git pull 2>/dev/null || print_warning "Could not update, using existing files"
+        print_step "Using local installation at $INSTALL_DIR"
+        return 0
+    fi
+
+    print_step "Downloading VibeReps"
+
+    # Preserve user data (exercise logs)
+    USER_DATA_FILE="$INSTALL_DIR/exercises.jsonl"
+    if [[ -f "$USER_DATA_FILE" ]]; then
+        BACKUP_DATA=$(mktemp)
+        cp "$USER_DATA_FILE" "$BACKUP_DATA"
+        print_step "Preserving existing exercise log"
+    fi
+
+    # Create install directory
+    mkdir -p "$INSTALL_DIR"
+
+    # Download and extract tarball
+    if curl -sSL "$RELEASE_URL" | tar -xz -C "$INSTALL_DIR" 2>/dev/null; then
+        print_success "Downloaded and extracted to $INSTALL_DIR"
     else
-        print_step "Installing VibeReps to $INSTALL_DIR"
-        git clone "$REPO_URL" "$INSTALL_DIR"
+        print_error "Failed to download release. Check your internet connection."
+        # Restore user data on failure
+        [[ -n "${BACKUP_DATA:-}" ]] && mv "$BACKUP_DATA" "$USER_DATA_FILE"
+        exit 1
+    fi
+
+    # Restore user data
+    if [[ -n "${BACKUP_DATA:-}" ]]; then
+        mv "$BACKUP_DATA" "$USER_DATA_FILE"
+        print_success "Restored exercise log"
     fi
 }
 
