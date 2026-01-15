@@ -387,6 +387,18 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             # Aggregate context from all active sessions
             aggregated = self._aggregate_sessions()
             self.wfile.write(json.dumps(aggregated).encode())
+        elif parsed_path.startswith('/assets/'):
+            # Serve static assets (favicon, icons)
+            asset_content = self.get_asset_file(parsed_path[8:])  # Remove '/assets/' prefix
+            if asset_content:
+                self.send_response(200)
+                content_type = self._get_content_type(parsed_path)
+                self.send_header('Content-type', content_type)
+                self.send_header('Cache-Control', 'max-age=86400')  # Cache for 1 day
+                self.end_headers()
+                self.wfile.write(asset_content)
+            else:
+                self.send_error(404, f"Asset not found: {parsed_path}")
         else:
             self.send_error(404)
 
@@ -609,6 +621,41 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             return file_path.read_text()
 
         return None
+
+    def get_asset_file(self, filename):
+        """Get content of a static asset file (binary)"""
+        # Security: prevent path traversal
+        if '..' in filename or filename.startswith('/'):
+            return None
+
+        assets_dir = Path(__file__).parent / "assets"
+        file_path = assets_dir / filename
+
+        # Ensure file is within assets directory
+        try:
+            file_path = file_path.resolve()
+            assets_dir = assets_dir.resolve()
+            if not str(file_path).startswith(str(assets_dir)):
+                return None
+        except (ValueError, OSError):
+            return None
+
+        if file_path.exists() and file_path.is_file():
+            return file_path.read_bytes()
+
+        return None
+
+    def _get_content_type(self, path):
+        """Get MIME type for a file path"""
+        ext = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
+        types = {
+            'ico': 'image/x-icon',
+            'png': 'image/png',
+            'svg': 'image/svg+xml',
+            'webmanifest': 'application/manifest+json',
+            'json': 'application/json',
+        }
+        return types.get(ext, 'application/octet-stream')
 
 
 PORT_FILE = Path("/tmp/vibereps-port")
