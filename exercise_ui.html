@@ -403,7 +403,7 @@
         .exercise-dropdown-item {
             display: block;
             width: 100%;
-            padding: 6px 10px;
+            padding: 10px 14px;
             background: transparent;
             border: none;
             color: var(--text);
@@ -1701,7 +1701,14 @@ const selector = document.getElementById('exerciseSelector');
             document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
             document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
             document.querySelector('.finish-btn').disabled = false;
-            document.querySelector('.finish-btn').onclick = () => window.close();
+            document.querySelector('.finish-btn').onclick = () => {
+                // Try to close the window - may not work due to browser security
+                window.close();
+                // If still open after a moment, update the message
+                setTimeout(() => {
+                    document.getElementById('status').textContent = '✅ Done! You can close this window (Cmd+W)';
+                }, 100);
+            };
 
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Claude Code Ready!', {
@@ -1884,21 +1891,37 @@ const selector = document.getElementById('exerciseSelector');
                     return;
                 }
 
-                let html = '<div class="context-header">Claude is working...</div>';
+                // Handle multi-session aggregated format
+                const sessionCount = context.session_count || 1;
+                const headerText = sessionCount > 1
+                    ? `${sessionCount} Claudes working...`
+                    : 'Claude is working...';
+                let html = `<div class="context-header">${headerText}</div>`;
 
                 if (context.summary) {
                     html += `<div class="context-summary">${escapeHtml(context.summary)}</div>`;
                 }
 
-                if (context.recent_activity && context.recent_activity.length > 0) {
+                // Show per-session summaries if multiple sessions
+                if (context.session_summaries && context.session_summaries.length > 1) {
+                    html += '<div class="context-activity">';
+                    for (const summary of context.session_summaries) {
+                        html += `<div class="activity-item">
+                            <span class="tool-badge">></span>
+                            <span>${escapeHtml(summary)}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                } else if (context.recent_activity && context.recent_activity.length > 0) {
                     html += '<div class="context-activity">';
                     // Show last 3 activities
                     const activities = context.recent_activity.slice(-3);
                     for (const activity of activities) {
+                        const sessionPrefix = activity.session ? `[${activity.session}] ` : '';
                         const toolBadge = activity.tool === 'thinking' ? '>' : `[${activity.tool}]`;
                         html += `<div class="activity-item">
                             <span class="tool-badge">${escapeHtml(toolBadge)}</span>
-                            <span>${escapeHtml(activity.description || '')}</span>
+                            <span>${escapeHtml(sessionPrefix + (activity.description || ''))}</span>
                         </div>`;
                     }
                     html += '</div>';
@@ -1991,14 +2014,14 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         function switchToSeatedExercise() {
-            // Find a random seated exercise
+            // Find a random seated exercise (check exercises list first, then configs)
             const seatedExercises = Object.keys(exercises).filter(id => {
-                const config = exerciseConfigs[id];
-                return config?.seated === true;
+                // Check the exercises list (always loaded) or full config if available
+                return exercises[id]?.seated === true || exerciseConfigs[id]?.seated === true;
             });
 
             if (seatedExercises.length === 0) {
-                document.getElementById('status').textContent = 'No seated exercises available';
+                document.getElementById('status').textContent = 'No seated exercises available. Try shoulder shrugs or chin tucks!';
                 return;
             }
 
@@ -2036,6 +2059,9 @@ const selector = document.getElementById('exerciseSelector');
         loadClaudeContext();
         enumerateCameras();
         loadExercises();
+
+        // Poll for context updates every 3 seconds
+        setInterval(loadClaudeContext, 3000);
     </script>
 </body>
 </html>
