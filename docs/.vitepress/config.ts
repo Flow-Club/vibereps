@@ -60,7 +60,7 @@ export default defineConfig({
 
     footer: {
       message: 'Stay healthy and keep coding!',
-      copyright: 'Made with 💪 by Flow Club'
+      copyright: 'Made with 💪 by <a href="https://www.flow.club" target="_blank">Flow Club</a>'
     },
 
     search: {
