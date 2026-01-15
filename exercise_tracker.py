@@ -114,7 +114,7 @@ def is_vibereps_window_open():
     return False
 
 
-def open_small_window(url: str, width: int = 340, height: int = 580):
+def open_small_window(url: str, width: int = 340, height: int = 680):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
@@ -590,6 +590,7 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                         "name": content.get("name", json_file.stem),
                         "description": content.get("description", ""),
                         "category": content.get("category", "general"),
+                        "seated": content.get("seated", False),
                         "reps": content.get("reps", {"normal": 10, "quick": 5}),
                         "file": json_file.name
                     })

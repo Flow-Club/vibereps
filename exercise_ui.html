@@ -403,7 +403,7 @@
         .exercise-dropdown-item {
             display: block;
             width: 100%;
-            padding: 6px 10px;
+            padding: 10px 14px;
             background: transparent;
             border: none;
             color: var(--text);
@@ -1701,7 +1701,14 @@ const selector = document.getElementById('exerciseSelector');
             document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
             document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
             document.querySelector('.finish-btn').disabled = false;
-            document.querySelector('.finish-btn').onclick = () => window.close();
+            document.querySelector('.finish-btn').onclick = () => {
+                // Try to close the window - may not work due to browser security
+                window.close();
+                // If still open after a moment, update the message
+                setTimeout(() => {
+                    document.getElementById('status').textContent = '✅ Done! You can close this window (Cmd+W)';
+                }, 100);
+            };
 
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Claude Code Ready!', {
@@ -2007,14 +2014,14 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         function switchToSeatedExercise() {
-            // Find a random seated exercise
+            // Find a random seated exercise (check exercises list first, then configs)
             const seatedExercises = Object.keys(exercises).filter(id => {
-                const config = exerciseConfigs[id];
-                return config?.seated === true;
+                // Check the exercises list (always loaded) or full config if available
+                return exercises[id]?.seated === true || exerciseConfigs[id]?.seated === true;
             });
 
             if (seatedExercises.length === 0) {
-                document.getElementById('status').textContent = 'No seated exercises available';
+                document.getElementById('status').textContent = 'No seated exercises available. Try shoulder shrugs or chin tucks!';
                 return;
             }
 
