@@ -72,6 +72,9 @@ VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 
+# Electron app port (fixed port for the menubar app, outside webapp's 8765-8774 range)
+ELECTRON_PORT = 8800
+
 # Exercises that require legs (filtered out when VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1)
 LEG_EXERCISES = {"squats", "calf_raises", "high_knees", "jumping_jacks"}
 
@@ -84,6 +87,76 @@ def get_filtered_exercises():
         exercise_list = [e for e in exercise_list if e not in LEG_EXERCISES]
         exercises = ",".join(exercise_list)
     return exercises
+
+
+def is_electron_app_running():
+    """Check if the VibeReps Electron menubar app is running."""
+    try:
+        req = urllib.request.Request(
+            f"http://localhost:{ELECTRON_PORT}/api/status",
+            headers={"Accept": "application/json"}
+        )
+        response = urllib.request.urlopen(req, timeout=1)
+        return response.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def generate_session_id():
+    """Generate a unique session ID based on terminal PID and timestamp."""
+    ppid = os.getppid()  # Parent process (Claude Code's shell)
+    timestamp = int(time.time() * 1000)
+    return f"session-{ppid}-{timestamp}"
+
+
+def register_with_electron_app(session_id: str, context: dict):
+    """Register a new session with the Electron menubar app."""
+    try:
+        data = json.dumps({
+            "session_id": session_id,
+            "pid": os.getpid(),
+            "context": context
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            f"http://localhost:{ELECTRON_PORT}/api/session/register",
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            method="POST"
+        )
+        response = urllib.request.urlopen(req, timeout=2)
+        result = json.loads(response.read().decode('utf-8'))
+        return result.get("success", False)
+    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+        print(f"Failed to register with Electron app: {e}", file=sys.stderr)
+        return False
+
+
+def report_activity_to_electron(session_id: str, tool_name: str, file_path: str = None):
+    """Report activity (tool use) to the Electron app."""
+    try:
+        data = json.dumps({
+            "session_id": session_id,
+            "tool_name": tool_name,
+            "file_path": file_path
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            f"http://localhost:{ELECTRON_PORT}/api/session/activity",
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=1)
+        return True
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def is_vibereps_window_open():
@@ -678,6 +751,48 @@ class ExerciseTrackerHook:
     def handle_hook(self, event_type, data):
         """Main hook handler"""
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
+            # First, check if Electron menubar app is running
+            if is_electron_app_running():
+                # Get or create session ID (persist across hook calls)
+                session_id_file = Path("/tmp/vibereps-session-id")
+                if session_id_file.exists():
+                    try:
+                        session_id = session_id_file.read_text().strip()
+                        # Validate session ID isn't too old (regenerate if > 1 hour)
+                        if time.time() - session_id_file.stat().st_mtime > 3600:
+                            session_id = generate_session_id()
+                            session_id_file.write_text(session_id)
+                    except (OSError, ValueError):
+                        session_id = generate_session_id()
+                        session_id_file.write_text(session_id)
+                else:
+                    session_id = generate_session_id()
+                    session_id_file.write_text(session_id)
+
+                # Build context from hook data
+                context = {}
+                if data:
+                    tool_name = data.get("tool_name", "")
+                    tool_input = data.get("tool_input", {})
+                    if tool_name in ("Write", "Edit"):
+                        file_path = tool_input.get("file_path", "")
+                        context["summary"] = f"Editing {Path(file_path).name}" if file_path else "Editing file"
+                        context["file_path"] = file_path
+                    elif tool_name == "Bash":
+                        command = tool_input.get("command", "")[:50]
+                        context["summary"] = f"Running: {command}"
+
+                # Register session and report activity
+                register_with_electron_app(session_id, context)
+                report_activity_to_electron(
+                    session_id,
+                    data.get("tool_name", "unknown") if data else "prompt",
+                    context.get("file_path")
+                )
+
+                return {"status": "success", "message": "Activity reported to Electron app", "session_id": session_id}
+
+            # Fall back to browser-based tracker if Electron app not running
             # Use a lock file to prevent race conditions when multiple hooks fire
             lock_file = Path("/tmp/vibereps-launch.lock")
 

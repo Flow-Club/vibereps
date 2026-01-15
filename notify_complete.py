@@ -15,6 +15,8 @@ from pathlib import Path
 
 PORT_FILE = Path("/tmp/vibereps-port")
 PORT_RANGE = range(8765, 8775)
+ELECTRON_PORT = 8800  # Different from webapp's 8765-8774 range
+SESSION_ID_FILE = Path("/tmp/vibereps-session-id")
 
 
 def read_hook_payload_from_stdin() -> dict:
@@ -25,6 +27,52 @@ def read_hook_payload_from_stdin() -> dict:
         except (json.JSONDecodeError, ValueError):
             pass
     return {}
+
+
+def is_electron_app_running():
+    """Check if the VibeReps Electron menubar app is running."""
+    try:
+        req = urllib.request.Request(
+            f"http://localhost:{ELECTRON_PORT}/api/status",
+            headers={"Accept": "application/json"}
+        )
+        response = urllib.request.urlopen(req, timeout=1)
+        return response.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def get_session_id():
+    """Get the current session ID if available."""
+    if SESSION_ID_FILE.exists():
+        try:
+            return SESSION_ID_FILE.read_text().strip()
+        except OSError:
+            pass
+    return None
+
+
+def notify_electron_app(notification_data: dict = None):
+    """Send notification to Electron menubar app."""
+    url = f"http://localhost:{ELECTRON_PORT}/api/notify"
+
+    payload = {"session_id": get_session_id()}
+    if notification_data:
+        payload["message"] = notification_data.get("message", "Claude finished!")
+        payload["notification_type"] = notification_data.get("notification_type", "")
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=2) as response:
+            result = json.loads(response.read().decode())
+            return {"status": "success", "message": "Electron app notified", "result": result}
+    except (urllib.error.URLError, OSError) as e:
+        return {"status": "error", "message": f"Failed to notify Electron app: {e}"}
 
 
 def discover_port():
@@ -98,7 +146,13 @@ def main():
     # Read hook payload from stdin (Claude Code passes data there)
     hook_data = read_hook_payload_from_stdin()
 
-    # Send notification with any available data
+    # First try Electron menubar app
+    if is_electron_app_running():
+        result = notify_electron_app(hook_data)
+        print(json.dumps(result))
+        return 0 if result["status"] == "success" else 1
+
+    # Fall back to legacy browser-based tracker
     result = notify_exercise_tracker(hook_data)
 
     # Output result for hook logging
