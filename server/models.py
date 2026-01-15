@@ -66,7 +66,12 @@ class DailySummaryRecord(Base):
 
 def init_db(database_url: str = "sqlite:///./vibereps.db"):
     """Initialize database and return session factory."""
-    engine = create_engine(database_url, connect_args={"check_same_thread": False})
+    # SQLite needs check_same_thread=False, PostgreSQL doesn't
+    if database_url.startswith("sqlite"):
+        engine = create_engine(database_url, connect_args={"check_same_thread": False})
+    else:
+        # PostgreSQL (Supabase) - use connection pooling
+        engine = create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return SessionLocal
