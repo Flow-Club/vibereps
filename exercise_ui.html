@@ -7,8 +7,30 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+    <script>
+        // Electron detection - check for preload API or URL param
+        window.isElectronApp = !!(window.electronAPI?.isElectron || new URLSearchParams(window.location.search).get('electron'));
+        window.mediapipeBasePath = window.isElectronApp ? '/mediapipe/pose' : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+    </script>
+    <script id="mediapipe-pose-script"></script>
+    <script id="mediapipe-camera-script"></script>
+    <script>
+        // Dynamically load MediaPipe based on environment
+        (function() {
+            const poseScript = document.getElementById('mediapipe-pose-script');
+            const cameraScript = document.getElementById('mediapipe-camera-script');
+
+            if (window.isElectronApp) {
+                poseScript.src = '/mediapipe/pose/pose.js';
+                cameraScript.src = '/mediapipe/camera_utils/camera_utils.js';
+            } else {
+                poseScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js';
+                poseScript.crossOrigin = 'anonymous';
+                cameraScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js';
+                cameraScript.crossOrigin = 'anonymous';
+            }
+        })();
+    </script>
     <style>
         :root, [data-theme="vscode"] {
             --bg: #1e1e1e;
@@ -131,6 +153,39 @@
             margin: 12px 0;
             flex-wrap: wrap;
             justify-content: center;
+        }
+        .session-selector {
+            display: none; /* Hidden by default, shown in Electron */
+            margin-bottom: 10px;
+            padding: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            align-items: center;
+            gap: 8px;
+        }
+        .session-selector.visible {
+            display: flex;
+        }
+        .session-selector label {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+        .session-selector select {
+            flex: 1;
+            padding: 4px 8px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .session-badge {
+            background: var(--accent);
+            color: var(--bg);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: bold;
         }
         button {
             padding: 6px 12px;
@@ -461,6 +516,14 @@
             </div>
         </div>
 
+        <div class="session-selector" id="sessionSelector">
+            <label>Session:</label>
+            <select id="sessionSelect">
+                <option value="">No active sessions</option>
+            </select>
+            <span class="session-badge" id="sessionBadge" style="display:none;">0</span>
+        </div>
+
         <div class="claude-context" id="claudeContext"></div>
 
         <div class="camera-selector" id="cameraSelector">
@@ -764,9 +827,10 @@ const selector = document.getElementById('exerciseSelector');
 
             try {
                 console.log('Initializing MediaPipe Pose...');
+                console.log('Using MediaPipe from:', window.mediapipeBasePath);
                 pose = new Pose({
                     locateFile: (file) => {
-                        const url = `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                        const url = `${window.mediapipeBasePath}/${file}`;
                         console.log('Loading MediaPipe file:', url);
                         return url;
                     }
@@ -2031,8 +2095,98 @@ const selector = document.getElementById('exerciseSelector');
         window.addEventListener('pagehide', notifyShutdown);
 
         // ============================================
+        // Electron-specific session handling
+        // ============================================
+        let currentSessions = [];
+        let selectedSessionId = null;
+
+        function updateSessionSelector(sessions) {
+            currentSessions = sessions || [];
+            const selector = document.getElementById('sessionSelector');
+            const select = document.getElementById('sessionSelect');
+            const badge = document.getElementById('sessionBadge');
+
+            if (!window.isElectronApp || currentSessions.length === 0) {
+                selector.classList.remove('visible');
+                return;
+            }
+
+            selector.classList.add('visible');
+
+            // Update badge
+            badge.textContent = currentSessions.length;
+            badge.style.display = currentSessions.length > 1 ? 'inline' : 'none';
+
+            // Update dropdown
+            select.innerHTML = currentSessions.map(s => {
+                const summary = s.context?.summary || `Session ${s.id.slice(0, 8)}`;
+                const status = s.status === 'complete' ? ' ✓' : '';
+                return `<option value="${s.id}">${summary}${status}</option>`;
+            }).join('');
+
+            // Select current session or first one
+            if (selectedSessionId && currentSessions.find(s => s.id === selectedSessionId)) {
+                select.value = selectedSessionId;
+            } else if (currentSessions.length > 0) {
+                selectedSessionId = currentSessions[0].id;
+                select.value = selectedSessionId;
+            }
+        }
+
+        function initElectronIPC() {
+            if (!window.electronAPI) return;
+
+            console.log('Initializing Electron IPC...');
+
+            // Listen for session updates
+            window.electronAPI.onSessionsUpdated((sessions) => {
+                console.log('Sessions updated:', sessions);
+                updateSessionSelector(sessions);
+            });
+
+            // Listen for session activity
+            window.electronAPI.onSessionActivity((activity) => {
+                console.log('Session activity:', activity);
+                // Update context display
+                if (activity.file_path) {
+                    const contextEl = document.getElementById('claudeContext');
+                    if (contextEl) {
+                        contextEl.innerHTML = `<div class="context-header">Claude is editing...</div><div>${activity.file_path.split('/').pop()}</div>`;
+                        contextEl.style.display = 'block';
+                    }
+                }
+            });
+
+            // Listen for Claude completion
+            window.electronAPI.onClaudeComplete((data) => {
+                console.log('Claude complete:', data);
+                const contextEl = document.getElementById('claudeContext');
+                if (contextEl) {
+                    contextEl.innerHTML = `<div class="context-header">Claude finished!</div><div>${data.message || 'Ready for exercise'}</div>`;
+                }
+            });
+
+            // Session selector change handler
+            document.getElementById('sessionSelect')?.addEventListener('change', (e) => {
+                selectedSessionId = e.target.value;
+                console.log('Selected session:', selectedSessionId);
+            });
+
+            // Initial session fetch
+            window.electronAPI.getSessions().then(sessions => {
+                updateSessionSelector(sessions);
+            }).catch(err => console.error('Failed to get sessions:', err));
+        }
+
+        // ============================================
         // Initialize on page load
         // ============================================
+        if (window.isElectronApp) {
+            initElectronIPC();
+            // Don't shutdown in Electron - we're a persistent app
+            window.removeEventListener('beforeunload', notifyShutdown);
+            window.removeEventListener('pagehide', notifyShutdown);
+        }
         loadClaudeContext();
         enumerateCameras();
         loadExercises();
