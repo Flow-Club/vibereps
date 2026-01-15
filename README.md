@@ -1,6 +1,6 @@
 # Vibe Reps
 
-Don't neglect your physical corpus.
+Don't neglect your physical corpus while Opus generates.
 
 Turn model generation time into movement.
 
