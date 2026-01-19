@@ -621,10 +621,12 @@ const selector = document.getElementById('exerciseSelector');
         // ============================================
         let standUpVerified = false;
         let pendingExercise = null;
+        let shownStepBackMessage = false;
 
         async function startWithStandUpCheck(exerciseId) {
             pendingExercise = exerciseId;
             standUpVerified = false;
+            shownStepBackMessage = false;
             repCount = 0;
             exerciseState = 'checking';
             startTime = Date.now();
@@ -635,8 +637,9 @@ const selector = document.getElementById('exerciseSelector');
             document.getElementById('counter').textContent = '?';
 
             // Check if this is a seated exercise (skip standup check)
+            // Check both exerciseConfigs and exercises list since configs may still be loading
             const config = exerciseConfigs[exerciseId];
-            const isSeated = config?.seated === true;
+            const isSeated = config?.seated === true || exercises[exerciseId]?.seated === true;
 
             if (isSeated) {
                 currentExercise = exerciseId;
@@ -723,9 +726,15 @@ const selector = document.getElementById('exerciseSelector');
                 .every(p => p && p.visibility > 0.5);
 
             if (!allVisible) {
-                document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                // Only update the message once to avoid interfering with link clicks
+                if (!shownStepBackMessage) {
+                    document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    shownStepBackMessage = true;
+                }
                 return false;
             }
+            // Reset flag when body becomes visible
+            shownStepBackMessage = false;
 
             const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
             const hipY = (leftHip.y + rightHip.y) / 2;
@@ -2014,18 +2023,39 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         function switchToSeatedExercise() {
-            // Find a random seated exercise (check exercises list first, then configs)
+            console.log('switchToSeatedExercise called, exercises:', Object.keys(exercises));
+
+            // Show immediate feedback
+            document.getElementById('status').textContent = 'Switching to seated exercise...';
+
+            // Check if exercises are loaded
+            if (Object.keys(exercises).length === 0) {
+                document.getElementById('status').textContent = 'Loading exercises... try again in a moment';
+                // Retry after exercises load
+                setTimeout(switchToSeatedExercise, 500);
+                return;
+            }
+
+            // Find seated exercises
             const seatedExercises = Object.keys(exercises).filter(id => {
-                // Check the exercises list (always loaded) or full config if available
-                return exercises[id]?.seated === true || exerciseConfigs[id]?.seated === true;
+                const fromList = exercises[id]?.seated === true;
+                const fromConfig = exerciseConfigs[id]?.seated === true;
+                return fromList || fromConfig;
             });
 
+            console.log('Seated exercises found:', seatedExercises);
+
             if (seatedExercises.length === 0) {
-                document.getElementById('status').textContent = 'No seated exercises available. Try shoulder shrugs or chin tucks!';
+                document.getElementById('status').textContent = 'No seated exercises available. Please add exercises with seated:true to your config.';
                 return;
             }
 
             const randomSeated = seatedExercises[Math.floor(Math.random() * seatedExercises.length)];
+            const exName = exercises[randomSeated]?.name || randomSeated;
+            console.log('Switching to:', randomSeated, exName);
+
+            // Update UI and switch
+            document.getElementById('status').textContent = `Starting ${exName}...`;
             switchExercise(randomSeated);
         }
 
@@ -2039,6 +2069,14 @@ const selector = document.getElementById('exerciseSelector');
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.exercise-dropdown')) {
                 closeExerciseDropdown();
+            }
+        });
+
+        // Handle seated exercises link clicks (event delegation)
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('seated-link')) {
+                e.preventDefault();
+                switchToSeatedExercise();
             }
         });
 
