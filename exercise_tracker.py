@@ -114,7 +114,7 @@ def is_vibereps_window_open():
     return False
 
 
-def open_small_window(url: str, width: int = 340, height: int = 680):
+def open_small_window(url: str, width: int = 340, height: int = 700):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
