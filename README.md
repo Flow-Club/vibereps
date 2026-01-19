@@ -102,11 +102,11 @@ Add to `~/.claude/settings.json`:
 
 - **Real-time pose detection** using MediaPipe AI
 - **Stand-up verification** - ensures you're fully visible before starting
-- **11 exercise types** including:
+- **13 exercise types** including:
   - Squats, push-ups, jumping jacks
   - Standing crunches, calf raises, side stretches
   - High knees, torso twists, arm circles
-  - Shoulder shrugs, chin tucks (posture correction)
+  - Shoulder shrugs, chin tucks, neck rotations, neck tilts (posture correction)
 - **Two modes:**
   - Quick mode: Keep exercising while Claude works ⚡
   - Normal mode: 10+ reps for breaks
