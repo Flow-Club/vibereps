@@ -542,8 +542,8 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 summaries.append(ctx["summary"])
             if ctx.get("recent_activity"):
                 for activity in ctx["recent_activity"]:
-                    activity["session"] = session_id[:8]  # Add session prefix
-                    all_activity.append(activity)
+                    # Copy to avoid mutating the original stored activity
+                    all_activity.append({**activity, "session": session_id[:8]})
 
         # Build aggregated summary
         if active_count > 0:
