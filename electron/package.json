@@ -1,5 +1,6 @@
 {
   "name": "vibereps",
+  "productName": "VibeReps",
   "version": "1.0.0",
   "description": "Exercise tracking menubar app for Claude Code",
   "main": "main.js",

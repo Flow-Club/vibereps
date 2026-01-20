@@ -4,6 +4,12 @@ const path = require('path');
 const fs = require('fs');
 const SessionManager = require('./session-manager');
 
+// Set app name before ready
+app.name = 'VibeReps';
+if (process.platform === 'darwin') {
+  app.setName('VibeReps');
+}
+
 // Configuration
 const HTTP_PORT = 8800;  // Different from webapp's 8765-8774 range
 const WINDOW_WIDTH = 400;
@@ -28,7 +34,8 @@ const mediapipePath = path.join(__dirname, 'assets', 'mediapipe');
 
 // Create tray icon
 function createTrayIcon() {
-  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  // Use Template image for macOS (adapts to dark/light mode)
+  const iconPath = path.join(__dirname, 'assets', 'iconTemplate.png');
 
   if (fs.existsSync(iconPath)) {
     // Load and resize for menubar (should be ~22x22 for macOS)
@@ -89,14 +96,32 @@ function setupHttpServer() {
     res.sendFile(exerciseUiPath);
   });
 
-  // Serve exercise configs
+  // Serve exercise list with full metadata
   expressApp.get('/exercises', (req, res) => {
     try {
+      const exercises = [];
       const files = fs.readdirSync(exercisesPath)
-        .filter(f => f.endsWith('.json'))
-        .map(f => f.replace('.json', ''));
-      res.json(files);
+        .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+        .sort();
+
+      for (const file of files) {
+        try {
+          const content = JSON.parse(fs.readFileSync(path.join(exercisesPath, file), 'utf8'));
+          exercises.push({
+            id: content.id || file.replace('.json', ''),
+            name: content.name || file.replace('.json', ''),
+            description: content.description || '',
+            category: content.category || 'general',
+            reps: content.reps || { normal: 10, quick: 5 },
+            file: file
+          });
+        } catch (e) {
+          console.warn(`Failed to parse exercise ${file}:`, e.message);
+        }
+      }
+      res.json(exercises);
     } catch (err) {
+      console.error('Failed to read exercises directory:', err);
       res.json([]);
     }
   });
@@ -299,13 +324,14 @@ function updateTrayTooltip() {
   tray.setToolTip(tooltip);
 }
 
-// Show the main window
+// Show the main window (recreate if destroyed)
 function showWindow() {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
   }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 // Setup camera permissions
@@ -344,14 +370,15 @@ function createWindow() {
     title: 'VibeReps'
   });
 
-  mainWindow.loadFile(exerciseUiPath, {
-    query: { electron: 'true' }
-  });
+  // Load from HTTP server so MediaPipe paths work correctly
+  mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true`);
 
   mainWindow.on('close', (event) => {
-    // Hide instead of close
-    event.preventDefault();
-    mainWindow.hide();
+    // Hide instead of close (unless app is quitting)
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('show', () => {
@@ -377,7 +404,7 @@ function createTray() {
     {
       label: 'Quit',
       click: () => {
-        mainWindow.destroy();  // Actually close
+        app.isQuitting = true;
         if (httpServer) httpServer.close();
         app.quit();
       }
@@ -440,6 +467,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  app.isQuitting = true;
   if (httpServer) {
     httpServer.close();
   }
