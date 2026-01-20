@@ -18,7 +18,7 @@ Turn model generation time into movement.
 curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 ```
 
-That's it! Restart Claude Code and you're ready to get jacked.
+Then restart Claude Code and run **`/setup-vibereps`** to choose your exercises.
 
 <details>
 <summary><b>Alternative: Install from local clone</b></summary>

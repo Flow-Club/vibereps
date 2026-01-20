@@ -52,4 +52,4 @@ You return to check the response
 curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 ```
 
-That's it! Restart Claude Code and you're ready to get jacked.
+Then restart Claude Code and run **`/setup-vibereps`** to choose your exercises.
