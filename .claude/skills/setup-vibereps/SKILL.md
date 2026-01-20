@@ -6,47 +6,76 @@ allowed-tools: Read, Write, Edit, AskUserQuestion, Bash
 
 # Setup Vibereps
 
-Guide users through first-time vibereps configuration.
+Guide users through vibereps configuration with a friendly setup wizard.
 
 ## Setup Flow
 
-### Step 1: Ask Exercise Preferences
+### Step 1: Ask Exercise Mode (Standing vs Seated)
 
-Use AskUserQuestion to ask:
+Use AskUserQuestion to ask about exercise preference:
 
 ```
-Question: "Which exercises do you want to do?"
-Header: "Exercises"
-MultiSelect: true
+Question: "What type of exercises would you like?"
+Header: "Mode"
+MultiSelect: false
 Options:
-- squats: "Lower body strength, good for desk workers"
+- "Standing & Seated (Recommended)": "Full variety - squats, jumping jacks, plus desk-friendly neck stretches"
+- "Standing only": "Active exercises - squats, jumping jacks, push-ups, calf raises"
+- "Seated only": "Desk-friendly - shoulder shrugs, chin tucks, neck stretches"
+```
+
+### Step 2: Ask Which Exercises
+
+Based on their mode choice, show relevant exercises:
+
+**Standing exercises:**
+- squats: "Lower body strength, counters hip flexor tightness"
 - jumping_jacks: "Cardio, gets blood flowing quickly"
 - calf_raises: "Subtle, can do while standing at desk"
 - standing_crunches: "Core workout, elbow to opposite knee"
 - side_stretches: "Flexibility, relieves back tension"
 - pushups: "Upper body, requires floor space"
-- shoulder_shrugs: "Seated, releases neck tension (tech neck)"
-- chin_tucks: "Seated, corrects forward head posture"
-- neck_tilts: "Seated, stretches sides of neck"
-- neck_rotations: "Seated, improves neck mobility"
-```
+- high_knees: "Cardio, raises heart rate"
+- torso_twists: "Core mobility, loosens spine"
+- arm_circles: "Shoulder mobility, easy warmup"
 
-### Step 2: Ask Trigger Preference
+**Seated exercises:**
+- shoulder_shrugs: "Releases neck and shoulder tension"
+- chin_tucks: "Corrects forward head posture (tech neck)"
+- neck_tilts: "Stretches sides of neck"
+- neck_rotations: "Improves neck mobility"
+
+Use AskUserQuestion with MultiSelect: true to let them pick specific exercises from the filtered list.
+
+### Step 3: Ask About Custom Exercises
 
 ```
-Question: "When should exercises trigger?"
-Header: "Trigger"
+Question: "Would you like to add your own custom exercises?"
+Header: "Custom"
+MultiSelect: false
 Options:
-- "After edits (Recommended)": "Exercise after Claude writes/edits code"
-- "After tasks": "Exercise when Claude completes a task"
-- "Manual only": "Only when you run the tracker yourself"
+- "No, use selected exercises": "Start with the exercises you chose"
+- "Yes, show me how": "Learn how to create custom exercise detection"
 ```
 
-### Step 3: Configure Hook
+If they choose "Yes", tell them:
+- Run `/add-exercise` in Claude Code to create a new exercise with guided setup
+- Or manually create JSON configs in the `exercises/` directory
 
-Based on answers, add to `~/.claude/settings.json`:
+### Step 4: Find Install Location
 
-**After edits:**
+```bash
+if [[ -f "$HOME/.vibereps/exercise_tracker.py" ]]; then
+    echo "$HOME/.vibereps"
+else
+    echo "$(pwd)"
+fi
+```
+
+### Step 5: Configure Hooks
+
+Read existing `~/.claude/settings.json` and update the PostToolUse hook with selected exercises:
+
 ```json
 {
   "hooks": {
@@ -58,6 +87,7 @@ Based on answers, add to `~/.claude/settings.json`:
       }]
     }],
     "Notification": [{
+      "matcher": "",
       "hooks": [{
         "type": "command",
         "command": "{vibereps_dir}/notify_complete.py '{}'"
@@ -67,53 +97,35 @@ Based on answers, add to `~/.claude/settings.json`:
 }
 ```
 
-**After tasks:**
-```json
-{
-  "hooks": {
-    "TaskComplete": [{
-      "hooks": [{
-        "type": "command",
-        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py task_complete '{}'"
-      }]
-    }],
-    "Notification": [{
-      "hooks": [{
-        "type": "command",
-        "command": "{vibereps_dir}/notify_complete.py '{}'"
-      }]
-    }]
-  }
-}
+Replace:
+- `{vibereps_dir}` with the detected path (use full path, not ~)
+- `{exercises}` with comma-separated exercise list (e.g., `squats,jumping_jacks,shoulder_shrugs`)
+
+Use Edit tool to update the settings file, preserving other settings.
+
+### Step 6: Summary
+
+Show a summary:
+```
+Setup complete!
+
+Selected exercises: squats, jumping_jacks, shoulder_shrugs, chin_tucks
+
+How it works:
+1. Claude edits a file → Exercise tracker launches
+2. Do a quick exercise while Claude works
+3. Get notified when Claude is ready!
+
+Useful commands:
+- /test-tracker     - Test the exercise tracker
+- /add-exercise     - Create a custom exercise
+- /tune-detection   - Adjust detection if reps aren't counting
+
+To change exercises later, run /setup-vibereps again.
 ```
 
-Replace `{vibereps_dir}` with the actual path (e.g., `~/.vibereps` or the repo path).
-Replace `{exercises}` with comma-separated exercise list (e.g., `squats,jumping_jacks,calf_raises`).
+## Important Notes
 
-### Step 4: Test
-
-Run a quick test:
-```bash
-./exercise_tracker.py user_prompt_submit '{}'
-```
-
-## Important Paths
-
-- Hook script: Use `$PWD/exercise_tracker.py` if in repo, or `~/.vibereps/exercise_tracker.py` if installed via curl
-- UI file: `exercise_ui.html` (same directory as hook script)
-- Settings: `~/.claude/settings.json`
-
-## Detecting Install Location
-
-Check which exists:
-```bash
-if [[ -f "$HOME/.vibereps/exercise_tracker.py" ]]; then
-    VIBEREPS_DIR="$HOME/.vibereps"
-elif [[ -f "./exercise_tracker.py" ]]; then
-    VIBEREPS_DIR="$(pwd)"
-fi
-```
-
-## Disable Later
-
-To temporarily disable, add `VIBEREPS_DISABLED=1` to the hook command.
+- Always use absolute paths in hooks (not ~, use full $HOME path)
+- The Notification hook should have an empty matcher "" to catch all notifications
+- Preserve existing hooks and settings when updating settings.json

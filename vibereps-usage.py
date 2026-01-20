@@ -89,6 +89,30 @@ def format_exercises(exercises: dict) -> str:
     return ", ".join(parts)
 
 
+def wrap_exercises(exercise_str: str, width: int) -> list:
+    """Wrap exercise string into multiple lines that fit within width."""
+    if not exercise_str or len(exercise_str) <= width:
+        return [exercise_str] if exercise_str else [""]
+
+    lines = []
+    parts = exercise_str.split(", ")
+    current_line = ""
+
+    for part in parts:
+        if not current_line:
+            current_line = part
+        elif len(current_line) + len(", ") + len(part) <= width:
+            current_line += ", " + part
+        else:
+            lines.append(current_line)
+            current_line = part
+
+    if current_line:
+        lines.append(current_line)
+
+    return lines if lines else [""]
+
+
 def print_table(ccusage_data, exercise_data):
     """Print combined table matching ccusage format with exercise columns."""
 
@@ -176,6 +200,7 @@ def print_table(ccusage_data, exercise_data):
         # Get models
         models = [format_model_name(m) for m in day.get("modelsUsed", [])]
         exercise_str = format_exercises(exercises)
+        exercise_lines = wrap_exercises(exercise_str, EXERCISE_W)
 
         # First row with data
         first_model = f"- {models[0]}" if models else "-"
@@ -188,12 +213,19 @@ def print_table(ccusage_data, exercise_data):
             f"{cache_read:,}" if cache_read else "",
             f"{tokens:,}" if tokens else "",
             f"${cost:,.2f}" if cost else "",
-            exercise_str
+            exercise_lines[0] if exercise_lines else ""
         ))
 
-        # Additional model rows
-        for model in models[1:]:
-            print(row("", f"- {model}", "", "", "", "", "", "", ""))
+        # Additional model rows and exercise continuation rows
+        remaining_models = models[1:]
+        remaining_exercises = exercise_lines[1:]
+
+        # Print whichever is longer: remaining models or exercise lines
+        max_extra_rows = max(len(remaining_models), len(remaining_exercises))
+        for j in range(max_extra_rows):
+            model_str = f"- {remaining_models[j]}" if j < len(remaining_models) else ""
+            exercise_continuation = remaining_exercises[j] if j < len(remaining_exercises) else ""
+            print(row("", model_str, "", "", "", "", "", "", exercise_continuation))
 
         # Separator between days (except last)
         if i < len(sorted_dates) - 1:
@@ -202,6 +234,7 @@ def print_table(ccusage_data, exercise_data):
     # Total row
     print(hline(LT, X, RT))
     total_exercise_str = format_exercises(dict(total_exercises))
+    total_exercise_lines = wrap_exercises(total_exercise_str, EXERCISE_W)
     print(row(
         "Total",
         "",
@@ -211,8 +244,11 @@ def print_table(ccusage_data, exercise_data):
         f"{total_cache_r:,}",
         f"{total_tokens:,}",
         f"${total_cost:,.2f}",
-        total_exercise_str
+        total_exercise_lines[0] if total_exercise_lines else ""
     ))
+    # Additional rows for wrapped exercise totals
+    for extra_line in total_exercise_lines[1:]:
+        print(row("", "", "", "", "", "", "", "", extra_line))
     print(hline(BL, BT, BR))
 
 
