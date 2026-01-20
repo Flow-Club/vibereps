@@ -458,7 +458,7 @@
         .exercise-dropdown-item {
             display: block;
             width: 100%;
-            padding: 6px 10px;
+            padding: 10px 14px;
             background: transparent;
             border: none;
             color: var(--text);
@@ -684,10 +684,12 @@ const selector = document.getElementById('exerciseSelector');
         // ============================================
         let standUpVerified = false;
         let pendingExercise = null;
+        let shownStepBackMessage = false;
 
         async function startWithStandUpCheck(exerciseId) {
             pendingExercise = exerciseId;
             standUpVerified = false;
+            shownStepBackMessage = false;
             repCount = 0;
             exerciseState = 'checking';
             startTime = Date.now();
@@ -698,8 +700,9 @@ const selector = document.getElementById('exerciseSelector');
             document.getElementById('counter').textContent = '?';
 
             // Check if this is a seated exercise (skip standup check)
+            // Check both exerciseConfigs and exercises list since configs may still be loading
             const config = exerciseConfigs[exerciseId];
-            const isSeated = config?.seated === true;
+            const isSeated = config?.seated === true || exercises[exerciseId]?.seated === true;
 
             if (isSeated) {
                 currentExercise = exerciseId;
@@ -738,6 +741,7 @@ const selector = document.getElementById('exerciseSelector');
                 }
 
                 console.log('Requesting camera with constraints:', videoConstraints);
+                document.getElementById('status').textContent = 'Requesting camera access...';
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: videoConstraints
                 });
@@ -746,6 +750,7 @@ const selector = document.getElementById('exerciseSelector');
                 console.log('Camera stream started');
 
                 if (!pose) {
+                    document.getElementById('status').textContent = 'Loading pose detection (first time may take a moment)...';
                     const success = await initPose();
                     if (!success) return;
                 }
@@ -786,9 +791,15 @@ const selector = document.getElementById('exerciseSelector');
                 .every(p => p && p.visibility > 0.5);
 
             if (!allVisible) {
-                document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                // Only update the message once to avoid interfering with link clicks
+                if (!shownStepBackMessage) {
+                    document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    shownStepBackMessage = true;
+                }
                 return false;
             }
+            // Reset flag when body becomes visible
+            shownStepBackMessage = false;
 
             const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
             const hipY = (leftHip.y + rightHip.y) / 2;
@@ -832,6 +843,10 @@ const selector = document.getElementById('exerciseSelector');
                     locateFile: (file) => {
                         const url = `${window.mediapipeBasePath}/${file}`;
                         console.log('Loading MediaPipe file:', url);
+                        // Update status for large model files
+                        if (file.includes('.tflite') || file.includes('.binarypb')) {
+                            document.getElementById('status').textContent = 'Downloading pose model...';
+                        }
                         return url;
                     }
                 });
@@ -1765,7 +1780,14 @@ const selector = document.getElementById('exerciseSelector');
             document.getElementById('status').textContent = '✅ Claude is ready! Check your response.';
             document.querySelector('.finish-btn').textContent = 'Return to Claude Code';
             document.querySelector('.finish-btn').disabled = false;
-            document.querySelector('.finish-btn').onclick = () => window.close();
+            document.querySelector('.finish-btn').onclick = () => {
+                // Try to close the window - may not work due to browser security
+                window.close();
+                // If still open after a moment, update the message
+                setTimeout(() => {
+                    document.getElementById('status').textContent = '✅ Done! You can close this window (Cmd+W)';
+                }, 100);
+            };
 
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Claude Code Ready!', {
@@ -1948,21 +1970,37 @@ const selector = document.getElementById('exerciseSelector');
                     return;
                 }
 
-                let html = '<div class="context-header">Claude is working...</div>';
+                // Handle multi-session aggregated format
+                const sessionCount = context.session_count || 1;
+                const headerText = sessionCount > 1
+                    ? `${sessionCount} Claudes working...`
+                    : 'Claude is working...';
+                let html = `<div class="context-header">${headerText}</div>`;
 
                 if (context.summary) {
                     html += `<div class="context-summary">${escapeHtml(context.summary)}</div>`;
                 }
 
-                if (context.recent_activity && context.recent_activity.length > 0) {
+                // Show per-session summaries if multiple sessions
+                if (context.session_summaries && context.session_summaries.length > 1) {
+                    html += '<div class="context-activity">';
+                    for (const summary of context.session_summaries) {
+                        html += `<div class="activity-item">
+                            <span class="tool-badge">></span>
+                            <span>${escapeHtml(summary)}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                } else if (context.recent_activity && context.recent_activity.length > 0) {
                     html += '<div class="context-activity">';
                     // Show last 3 activities
                     const activities = context.recent_activity.slice(-3);
                     for (const activity of activities) {
+                        const sessionPrefix = activity.session ? `[${activity.session}] ` : '';
                         const toolBadge = activity.tool === 'thinking' ? '>' : `[${activity.tool}]`;
                         html += `<div class="activity-item">
                             <span class="tool-badge">${escapeHtml(toolBadge)}</span>
-                            <span>${escapeHtml(activity.description || '')}</span>
+                            <span>${escapeHtml(sessionPrefix + (activity.description || ''))}</span>
                         </div>`;
                     }
                     html += '</div>';
@@ -2055,18 +2093,39 @@ const selector = document.getElementById('exerciseSelector');
         }
 
         function switchToSeatedExercise() {
-            // Find a random seated exercise
+            console.log('switchToSeatedExercise called, exercises:', Object.keys(exercises));
+
+            // Show immediate feedback
+            document.getElementById('status').textContent = 'Switching to seated exercise...';
+
+            // Check if exercises are loaded
+            if (Object.keys(exercises).length === 0) {
+                document.getElementById('status').textContent = 'Loading exercises... try again in a moment';
+                // Retry after exercises load
+                setTimeout(switchToSeatedExercise, 500);
+                return;
+            }
+
+            // Find seated exercises
             const seatedExercises = Object.keys(exercises).filter(id => {
-                const config = exerciseConfigs[id];
-                return config?.seated === true;
+                const fromList = exercises[id]?.seated === true;
+                const fromConfig = exerciseConfigs[id]?.seated === true;
+                return fromList || fromConfig;
             });
 
+            console.log('Seated exercises found:', seatedExercises);
+
             if (seatedExercises.length === 0) {
-                document.getElementById('status').textContent = 'No seated exercises available';
+                document.getElementById('status').textContent = 'No seated exercises available. Please add exercises with seated:true to your config.';
                 return;
             }
 
             const randomSeated = seatedExercises[Math.floor(Math.random() * seatedExercises.length)];
+            const exName = exercises[randomSeated]?.name || randomSeated;
+            console.log('Switching to:', randomSeated, exName);
+
+            // Update UI and switch
+            document.getElementById('status').textContent = `Starting ${exName}...`;
             switchExercise(randomSeated);
         }
 
@@ -2080,6 +2139,14 @@ const selector = document.getElementById('exerciseSelector');
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.exercise-dropdown')) {
                 closeExerciseDropdown();
+            }
+        });
+
+        // Handle seated exercises link clicks (event delegation)
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('seated-link')) {
+                e.preventDefault();
+                switchToSeatedExercise();
             }
         });
 
@@ -2190,6 +2257,9 @@ const selector = document.getElementById('exerciseSelector');
         loadClaudeContext();
         enumerateCameras();
         loadExercises();
+
+        // Poll for context updates every 3 seconds
+        setInterval(loadClaudeContext, 3000);
     </script>
 </body>
 </html>

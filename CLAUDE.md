@@ -78,8 +78,8 @@ Located in `exercise_ui.html`. Rep counting uses MediaPipe pose landmarks with a
 - **Calf Raises**: Heel lift relative to baseline position
 
 **Movement-based exercises** (use relative landmark distances):
-- **Russian Twists**: Shoulder twist amount relative to hips
-- **Side Bends**: Shoulder tilt from center
+- **Torso Twists**: Shoulder twist amount relative to hips
+- **Side Stretches**: Shoulder tilt from center
 - **Arm Circles**: Wrist position tracking through quadrants
 
 #### State Machine
@@ -121,6 +121,8 @@ For position-based exercises, the "reset" threshold is typically 30-40% of the t
 | Arm Circles | Wrist angle | Quadrant tracking | Full circle |
 | Shoulder Shrugs | Shoulder elevation | Baseline | > threshold |
 | Chin Tucks | Head position | Baseline | > 0.02 (x-axis) |
+| Neck Rotations | Head rotation | Center | > threshold |
+| Neck Tilts | Head tilt | Center | > threshold |
 
 #### Adding New Exercises
 

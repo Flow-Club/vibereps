@@ -187,7 +187,7 @@ def is_vibereps_window_open():
     return False
 
 
-def open_small_window(url: str, width: int = 340, height: int = 580):
+def open_small_window(url: str, width: int = 340, height: int = 700):
     """Open URL in a small browser window (Chrome app mode preferred)."""
     import platform
     import shutil
@@ -397,8 +397,10 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
     completion_data = {}
     claude_complete = False
     quick_mode = False
-    claude_context = {}  # What Claude is working on (from hook payload + transcript)
+    claude_sessions = {}  # {session_id: {context: {...}, last_seen: timestamp}}
     tracker = None  # Reference to ExerciseTrackerHook for shutdown coordination
+    SESSION_TIMEOUT = 1800  # 30 minutes - remove stale sessions
+    COMPLETED_SESSION_TIMEOUT = 120  # 2 minutes - remove completed sessions faster
 
     def do_GET(self):
         """Serve the exercise tracker HTML and exercise definitions"""
@@ -446,12 +448,18 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             else:
                 self.send_error(404, f"Exercise file not found: {filename}")
         elif parsed_path == '/context':
-            # Serve Claude context (what Claude is working on)
+            # Serve aggregated Claude context from all sessions
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps(ExerciseHTTPHandler.claude_context).encode())
+
+            # Clean up stale sessions
+            self._cleanup_stale_sessions()
+
+            # Aggregate context from all active sessions
+            aggregated = self._aggregate_sessions()
+            self.wfile.write(json.dumps(aggregated).encode())
         elif parsed_path.startswith('/assets/'):
             # Serve static assets (favicon, icons)
             asset_content = self.get_asset_file(parsed_path[8:])  # Remove '/assets/' prefix
@@ -501,6 +509,27 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 }).encode())
             except Exception as e:
                 self.send_error(500, str(e))
+        elif self.path == '/update-context':
+            # Update context for a specific Claude session
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length)
+                    data = json.loads(post_data.decode())
+                    session_id = data.get("session_id", "default")
+                    context = data.get("context", {})
+
+                    ExerciseHTTPHandler.claude_sessions[session_id] = {
+                        "context": context,
+                        "last_seen": time.time()
+                    }
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "updated"}).encode())
+            except Exception as e:
+                self.send_error(500, str(e))
         elif self.path == '/notify':
             # Notification from Claude that it's done
             try:
@@ -508,10 +537,14 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                 if content_length > 0:
                     post_data = self.rfile.read(content_length)
                     notify_data = json.loads(post_data.decode())
-                    # Update context with notification info
-                    if notify_data.get("message"):
-                        ExerciseHTTPHandler.claude_context["notification"] = notify_data.get("message")
-                        ExerciseHTTPHandler.claude_context["notification_type"] = notify_data.get("notification_type")
+                    session_id = notify_data.get("session_id", "default")
+
+                    # Update the session with notification info
+                    if session_id in ExerciseHTTPHandler.claude_sessions:
+                        if notify_data.get("message"):
+                            ExerciseHTTPHandler.claude_sessions[session_id]["context"]["notification"] = notify_data.get("message")
+                            ExerciseHTTPHandler.claude_sessions[session_id]["context"]["notification_type"] = notify_data.get("notification_type")
+                        ExerciseHTTPHandler.claude_sessions[session_id]["context"]["complete"] = True
 
                 ExerciseHTTPHandler.claude_complete = True
 
@@ -541,6 +574,69 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
         """Suppress server logs"""
         pass
 
+    def _cleanup_stale_sessions(self):
+        """Remove sessions that haven't been updated recently"""
+        now = time.time()
+        stale_ids = []
+        for sid, data in ExerciseHTTPHandler.claude_sessions.items():
+            age = now - data.get("last_seen", 0)
+            is_complete = data.get("context", {}).get("complete", False)
+            # Completed sessions expire faster
+            timeout = ExerciseHTTPHandler.COMPLETED_SESSION_TIMEOUT if is_complete else ExerciseHTTPHandler.SESSION_TIMEOUT
+            if age > timeout:
+                stale_ids.append(sid)
+        for sid in stale_ids:
+            del ExerciseHTTPHandler.claude_sessions[sid]
+
+    def _aggregate_sessions(self):
+        """Aggregate context from all active sessions for display"""
+        sessions = ExerciseHTTPHandler.claude_sessions
+        if not sessions:
+            return {}
+
+        # Single session - return its context directly
+        if len(sessions) == 1:
+            return list(sessions.values())[0]["context"]
+
+        # Multiple sessions - aggregate
+        all_activity = []
+        summaries = []
+        active_count = 0
+        complete_count = 0
+
+        for session_id, data in sessions.items():
+            ctx = data.get("context", {})
+            if ctx.get("complete"):
+                complete_count += 1
+            else:
+                active_count += 1
+
+            if ctx.get("summary"):
+                summaries.append(ctx["summary"])
+            if ctx.get("recent_activity"):
+                for activity in ctx["recent_activity"]:
+                    # Copy to avoid mutating the original stored activity
+                    all_activity.append({**activity, "session": session_id[:8]})
+
+        # Build aggregated summary
+        if active_count > 0:
+            summary = f"{active_count} Claude{'s' if active_count > 1 else ''} working"
+            if complete_count > 0:
+                summary += f", {complete_count} done"
+        elif complete_count > 0:
+            summary = f"{complete_count} Claude{'s' if complete_count > 1 else ''} finished"
+        else:
+            summary = None
+
+        return {
+            "summary": summary,
+            "session_summaries": summaries,
+            "recent_activity": all_activity[:10],  # Limit to 10 most recent
+            "session_count": len(sessions),
+            "active_count": active_count,
+            "complete_count": complete_count
+        }
+
     def get_exercise_interface(self):
         """Load the HTML interface from the external file"""
         html_path = Path(__file__).parent / "exercise_ui.html"
@@ -567,6 +663,7 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
                         "name": content.get("name", json_file.stem),
                         "description": content.get("description", ""),
                         "category": content.get("category", "general"),
+                        "seated": content.get("seated", False),
                         "reps": content.get("reps", {"normal": 10, "quick": 5}),
                         "file": json_file.name
                     })
@@ -645,6 +742,15 @@ class ExerciseTrackerHook:
         self.server = None
         self.server_thread = None
         self.shutdown_requested = False
+
+    def _get_session_id(self, hook_data):
+        """Generate a session ID from hook data (uses cwd as identifier)"""
+        if hook_data and hook_data.get("cwd"):
+            # Use cwd as session ID - different Claude instances have different working dirs
+            import hashlib
+            return hashlib.md5(hook_data["cwd"].encode()).hexdigest()[:12]
+        # Fallback to default
+        return "default"
 
     def find_available_port(self):
         """Find an available port in the range, using port binding as the lock."""
@@ -837,7 +943,21 @@ class ExerciseTrackerHook:
             running_port = check_server_running()
             if running_port:
                 lock_file.unlink(missing_ok=True)
-                return {"status": "skipped", "message": "Exercise tracker already running"}
+                # Server already running - send updated context
+                try:
+                    session_id = self._get_session_id(data)
+                    context = build_claude_context(data) if data else {}
+                    payload = json.dumps({"session_id": session_id, "context": context}).encode()
+                    req = urllib.request.Request(
+                        f"http://localhost:{running_port}/update-context",
+                        data=payload,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    urllib.request.urlopen(req, timeout=2)
+                except Exception:
+                    pass  # Best effort - don't fail if update doesn't work
+                return {"status": "updated", "message": "Updated context in running exercise tracker"}
 
             # Launch detached background process
             script_path = os.path.abspath(__file__)
@@ -910,10 +1030,16 @@ def read_hook_payload_from_stdin() -> dict:
 def main():
     # Check if running as daemon
     if len(sys.argv) > 1 and sys.argv[1] == "--daemon":
-        # Load context from temp file (written by parent process)
+        # Load initial session from temp file (written by parent process)
         if CONTEXT_FILE.exists():
             try:
-                ExerciseHTTPHandler.claude_context = json.loads(CONTEXT_FILE.read_text())
+                data = json.loads(CONTEXT_FILE.read_text())
+                session_id = data.get("session_id", "default")
+                context = data.get("context", data)  # Support old format too
+                ExerciseHTTPHandler.claude_sessions[session_id] = {
+                    "context": context,
+                    "last_seen": time.time()
+                }
             except (json.JSONDecodeError, OSError):
                 pass
 
@@ -934,17 +1060,20 @@ def main():
     # Read actual hook payload from stdin (Claude Code passes it there)
     hook_data = read_hook_payload_from_stdin()
 
+    # Initialize tracker first (needed for session ID generation)
+    tracker = ExerciseTrackerHook()
+
     # Build context from hook payload + transcript
     if hook_data:
         context = build_claude_context(hook_data)
-        # Write context to temp file for daemon to read
+        session_id = tracker._get_session_id(hook_data)
+        # Write context with session_id to temp file for daemon to read
         try:
-            CONTEXT_FILE.write_text(json.dumps(context))
+            CONTEXT_FILE.write_text(json.dumps({"session_id": session_id, "context": context}))
         except OSError:
             pass
 
-    # Initialize and run tracker
-    tracker = ExerciseTrackerHook()
+    # Run tracker
     result = tracker.handle_hook(event_type, hook_data)
 
     print(json.dumps(result))

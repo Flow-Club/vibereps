@@ -148,6 +148,82 @@ Tracks movement from a baseline position (captured at start):
 }
 ```
 
+### `tilt`
+
+Detects tilting movement (side bends, head tilts, rotations):
+
+```json
+{
+  "type": "tilt",
+  "landmarks": {
+    "upper": [0],
+    "lower": [11, 12],
+    "_names": ["nose", "shoulders"]
+  },
+  "thresholds": {
+    "trigger": 0.15
+  },
+  "states": ["center", "side"],
+  "countOn": "center"
+}
+```
+
+### `height_baseline`
+
+Tracks vertical movement from a captured baseline (e.g., shoulder shrugs):
+
+```json
+{
+  "type": "height_baseline",
+  "landmarks": {
+    "target": [11, 12],
+    "_names": ["shoulders"]
+  },
+  "thresholds": {
+    "trigger": 0.02
+  },
+  "states": ["ready", "up", "down"],
+  "countOn": "up"
+}
+```
+
+### `width_ratio`
+
+Measures body width ratio changes (e.g., torso twists):
+
+```json
+{
+  "type": "width_ratio",
+  "landmarks": {
+    "measure": [11, 12],
+    "reference": [23, 24],
+    "_names": ["shoulders", "hips"]
+  },
+  "thresholds": {
+    "trigger": 0.6
+  },
+  "states": ["center", "twisted"],
+  "countOn": "center"
+}
+```
+
+### `quadrant_tracking`
+
+Tracks circular motion through quadrants (e.g., arm circles):
+
+```json
+{
+  "type": "quadrant_tracking",
+  "landmarks": {
+    "tracking": [15],
+    "center": [11],
+    "_names": ["left_wrist", "left_shoulder"]
+  },
+  "states": ["ready", "circling"],
+  "countOn": "complete_circle"
+}
+```
+
 ## Available Landmarks
 
 MediaPipe provides these landmarks:
