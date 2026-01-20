@@ -678,6 +678,7 @@ const selector = document.getElementById('exerciseSelector');
                 }
 
                 console.log('Requesting camera with constraints:', videoConstraints);
+                document.getElementById('status').textContent = 'Requesting camera access...';
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: videoConstraints
                 });
@@ -686,6 +687,7 @@ const selector = document.getElementById('exerciseSelector');
                 console.log('Camera stream started');
 
                 if (!pose) {
+                    document.getElementById('status').textContent = 'Loading pose detection (first time may take a moment)...';
                     const success = await initPose();
                     if (!success) return;
                 }
@@ -777,6 +779,10 @@ const selector = document.getElementById('exerciseSelector');
                     locateFile: (file) => {
                         const url = `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
                         console.log('Loading MediaPipe file:', url);
+                        // Update status for large model files
+                        if (file.includes('.tflite') || file.includes('.binarypb')) {
+                            document.getElementById('status').textContent = 'Downloading pose model...';
+                        }
                         return url;
                     }
                 });
