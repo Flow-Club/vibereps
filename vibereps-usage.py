@@ -63,19 +63,9 @@ def format_model_name(model: str) -> str:
 
 
 def format_exercise_short(exercise: str) -> str:
-    """Shorten exercise name for display."""
-    abbrevs = {
-        "jumping_jacks": "JJ",
-        "standing_crunches": "crunches",
-        "calf_raises": "calves",
-        "side_stretches": "stretches",
-        "high_knees": "knees",
-        "torso_twists": "twists",
-        "arm_circles": "arms",
-        "shoulder_shrugs": "shrugs",
-        "chin_tucks": "chins",
-    }
-    return abbrevs.get(exercise, exercise)
+    """Format exercise name for display."""
+    # Title case and remove underscores
+    return exercise.replace("_", " ").title()
 
 
 def format_exercises(exercises: dict) -> str:
@@ -149,7 +139,7 @@ def print_table(ccusage_data, exercise_data):
     # Header
     print(hline(TL, TT, TR))
     print(row("Date", "Models", "Input", "Output", "Cache Create", "Cache Read",
-              "Total", "Cost", "Exercises"))
+              "Total Tokens", "Cost", "Exercises"))
     print(hline(LT, X, RT))
 
     # Collect all dates
