@@ -26,7 +26,13 @@
     "mac": {
       "category": "public.app-category.healthcare-fitness",
       "icon": "assets/icon.icns",
-      "target": ["dmg", "zip"]
+      "target": ["dir"],
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "VibeReps needs camera access for exercise pose detection",
+        "NSMicrophoneUsageDescription": "VibeReps may request microphone access for media features"
+      }
     },
     "files": [
       "**/*",
@@ -41,6 +47,9 @@
         "from": "../exercises",
         "to": "exercises"
       }
+    ],
+    "asarUnpack": [
+      "assets/mediapipe/**"
     ]
   }
 }

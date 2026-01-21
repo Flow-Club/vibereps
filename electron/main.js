@@ -2,10 +2,13 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, session, nativeImage, Notificat
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
+const os = require('os');
 const SessionManager = require('./session-manager');
 
-// Set app name before ready
+// Set app and process name
 app.name = 'VibeReps';
+process.title = 'VibeReps';
 if (process.platform === 'darwin') {
   app.setName('VibeReps');
 }
@@ -31,18 +34,89 @@ const exercisesPath = isDev
   ? path.join(resourcesPath, 'exercises')
   : path.join(resourcesPath, 'exercises');
 const mediapipePath = path.join(__dirname, 'assets', 'mediapipe');
+const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
+
+// Get today's date in YYYY-MM-DD format
+function getTodayDate() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// Get today's exercise stats from log file
+function getTodayExerciseStats() {
+  const today = getTodayDate();
+  const stats = {};
+  let totalReps = 0;
+
+  try {
+    if (fs.existsSync(exerciseLogPath)) {
+      const lines = fs.readFileSync(exerciseLogPath, 'utf8').trim().split('\n');
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          const date = entry.timestamp?.split('T')[0];
+          if (date === today && entry.reps > 0 && !entry.exercise?.startsWith('_')) {
+            const exercise = entry.exercise || 'unknown';
+            stats[exercise] = (stats[exercise] || 0) + entry.reps;
+            totalReps += entry.reps;
+          }
+        } catch (e) { /* skip malformed lines */ }
+      }
+    }
+  } catch (err) {
+    console.error('Error reading exercise log:', err);
+  }
+
+  return { stats, totalReps };
+}
+
+// Get today's Claude Code usage via ccusage
+function getTodayClaudeStats() {
+  try {
+    // ccusage expects YYYYMMDD format
+    const today = getTodayDate().replace(/-/g, '');
+    const result = execSync(`npx ccusage daily --json --since ${today}`, {
+      encoding: 'utf8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    const data = JSON.parse(result);
+    if (data.daily && data.daily.length > 0) {
+      const day = data.daily[0];
+      return {
+        totalTokens: day.totalTokens || 0,
+        totalCost: day.totalCost || 0,
+        models: day.modelsUsed || []
+      };
+    }
+  } catch (err) {
+    console.error('ccusage error:', err.message);
+  }
+  return null;
+}
+
+// Format exercise name for display
+function formatExerciseName(name) {
+  return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Format token count for display
+function formatTokens(tokens) {
+  if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
+  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
+  return tokens.toString();
+}
 
 // Create tray icon
 function createTrayIcon() {
-  // Use Template image for macOS (adapts to dark/light mode)
+  // Use Template image for macOS (black silhouette, adapts to dark/light mode)
   const iconPath = path.join(__dirname, 'assets', 'iconTemplate.png');
 
   if (fs.existsSync(iconPath)) {
-    // Load and resize for menubar (should be ~22x22 for macOS)
+    // Load and resize for menubar (should be ~18-22px for macOS)
     let icon = nativeImage.createFromPath(iconPath);
     // Resize to appropriate menubar size
     icon = icon.resize({ width: 18, height: 18 });
-    // Mark as template for macOS dark/light mode
+    // Mark as template for macOS dark/light mode adaptation
     icon.setTemplateImage(true);
     return icon;
   }
@@ -231,6 +305,11 @@ function setupHttpServer() {
       mainWindow.webContents.send('exercise-complete', logEntry);
     }
 
+    // Refresh menu to show updated stats
+    if (tray) {
+      tray.setContextMenu(buildContextMenu());
+    }
+
     res.json({ success: true, logged: true });
   });
 
@@ -258,6 +337,10 @@ function setupHttpServer() {
   expressApp.post('/complete', (req, res) => {
     const { exercise, reps, duration } = req.body;
     logExercise({ timestamp: new Date().toISOString(), exercise, reps, duration });
+    // Refresh menu to show updated stats
+    if (tray) {
+      tray.setContextMenu(buildContextMenu());
+    }
     res.json({ success: true });
   });
 
@@ -371,7 +454,8 @@ function createWindow() {
   });
 
   // Load from HTTP server so MediaPipe paths work correctly
-  mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true`);
+  // Load with quick=true to auto-select random exercise
+  mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true&quick=true`);
 
   mainWindow.on('close', (event) => {
     // Hide instead of close (unless app is quitting)
@@ -390,34 +474,94 @@ function createWindow() {
   });
 }
 
+// Build the context menu with current stats
+function buildContextMenu() {
+  const menuItems = [];
+
+  // Today's exercise stats
+  const { stats: exerciseStats, totalReps } = getTodayExerciseStats();
+
+  menuItems.push({
+    label: `💪 Today: ${totalReps} reps`,
+    enabled: false
+  });
+
+  // Add individual exercise breakdown if any
+  const exercises = Object.entries(exerciseStats);
+  if (exercises.length > 0) {
+    for (const [exercise, reps] of exercises.sort((a, b) => b[1] - a[1]).slice(0, 5)) {
+      menuItems.push({
+        label: `    ${formatExerciseName(exercise)}: ${reps}`,
+        enabled: false
+      });
+    }
+  }
+
+  menuItems.push({ type: 'separator' });
+
+  // Today's Claude Code stats
+  const claudeStats = getTodayClaudeStats();
+  if (claudeStats) {
+    menuItems.push({
+      label: `🤖 Claude: ${formatTokens(claudeStats.totalTokens)} tokens ($${claudeStats.totalCost.toFixed(2)})`,
+      enabled: false
+    });
+  } else {
+    menuItems.push({
+      label: '🤖 Claude: No usage data',
+      enabled: false
+    });
+  }
+
+  menuItems.push({ type: 'separator' });
+
+  // Actions
+  menuItems.push({
+    label: 'Show VibeReps',
+    click: () => showWindow()
+  });
+
+  menuItems.push({
+    label: 'Refresh Stats',
+    click: () => {
+      tray.setContextMenu(buildContextMenu());
+    }
+  });
+
+  menuItems.push({ type: 'separator' });
+
+  menuItems.push({
+    label: 'Quit',
+    click: () => {
+      app.isQuitting = true;
+      if (httpServer) httpServer.close();
+      app.quit();
+    }
+  });
+
+  return Menu.buildFromTemplate(menuItems);
+}
+
 // Create the tray icon and menu
 function createTray() {
   const icon = createTrayIcon();
   tray = new Tray(icon);
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show VibeReps',
-      click: () => showWindow()
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        app.isQuitting = true;
-        if (httpServer) httpServer.close();
-        app.quit();
-      }
-    }
-  ]);
-
   tray.setToolTip('VibeReps');
-  tray.setContextMenu(contextMenu);
+  tray.setContextMenu(buildContextMenu());
 
-  // Click to show window
+  // Right-click shows context menu (default behavior)
+  // Left-click also shows context menu instead of opening window
   tray.on('click', () => {
-    showWindow();
+    tray.popUpContextMenu();
   });
+
+  // Refresh menu periodically (every 5 minutes)
+  setInterval(() => {
+    if (tray) {
+      tray.setContextMenu(buildContextMenu());
+    }
+  }, 5 * 60 * 1000);
 
   console.log('VibeReps tray created');
 }
