@@ -6,8 +6,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
+    "build": "electron-builder --mac dir",
+    "build:dmg": "electron-builder --mac dmg",
+    "build:all": "electron-builder --mac dmg zip",
+    "install": "./install.sh",
     "download-mediapipe": "node scripts/download-mediapipe.js"
   },
   "author": "",
@@ -26,7 +28,6 @@
     "mac": {
       "category": "public.app-category.healthcare-fitness",
       "icon": "assets/icon.icns",
-      "target": ["dir"],
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {
@@ -34,9 +35,28 @@
         "NSMicrophoneUsageDescription": "VibeReps may request microphone access for media features"
       }
     },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 400
+      }
+    },
     "files": [
       "**/*",
-      "!scripts/**"
+      "!scripts/**",
+      "!install.sh"
     ],
     "extraResources": [
       {

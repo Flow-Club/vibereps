@@ -42,6 +42,49 @@ cd vibereps
 
 ---
 
+## 🖥️ Menubar App (Electron)
+
+For a more integrated experience, use the **VibeReps menubar app**:
+
+- Always-on menubar presence with exercise/usage stats
+- Random exercise auto-selection
+- Native desktop notifications
+- Multi-instance Claude session tracking
+- Works offline (bundled MediaPipe)
+
+### Install Menubar App
+
+```bash
+cd electron
+./install.sh
+```
+
+This will:
+1. Build the native macOS app
+2. Install to /Applications
+3. Optionally configure Claude Code hooks
+
+Or build a distributable DMG:
+```bash
+cd electron
+npm install
+npm run build:dmg
+# Output: electron/dist/VibeReps-1.0.0.dmg
+```
+
+<details>
+<summary><b>Menubar App Features</b></summary>
+
+- **Stats in menu**: Today's reps and Claude Code usage at a glance
+- **Auto-refresh**: Stats update after each exercise
+- **Random exercise**: Opens with a random exercise (quick mode)
+- **Session tracking**: Tracks multiple Claude instances
+- **Start at login**: Add to Login Items for always-on tracking
+
+</details>
+
+---
+
 ## 🎯 How It Works
 
 **The workflow:** Claude edits a file → Exercise until Claude is done → Get notified when ready
@@ -116,10 +159,17 @@ Add to `~/.claude/settings.json`:
 
 ## 📋 Requirements
 
+**Browser Version:**
 - Python 3 (standard library only!)
 - Modern web browser (Chrome, Firefox, Safari)
 - Webcam
 - Internet connection (for MediaPipe CDN)
+
+**Menubar App (Electron):**
+- macOS 10.15+
+- Node.js 18+ (for building)
+- Webcam
+- No internet required (MediaPipe bundled)
 
 ## 🔧 Configuration
 
@@ -201,6 +251,16 @@ which python3  # Use this path if needed
 - Grant notification permission when prompted
 - Check browser notification settings
 - Check system notification preferences
+
+**Menubar app camera not working?**
+- Check System Settings > Privacy & Security > Camera
+- Ensure VibeReps has camera permission
+- Try: `tccutil reset Camera com.vibereps.app`
+
+**Menubar app not showing stats?**
+- Click "Refresh Stats" in the menu
+- Ensure exercises are being logged to `~/.vibereps/exercises.jsonl`
+- For Claude usage, ensure `ccusage` is installed: `npm install -g ccusage`
 
 ## 🤖 Claude Code Skills
 
