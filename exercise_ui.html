@@ -732,12 +732,12 @@ const selector = document.getElementById('exerciseSelector');
                 }
 
                 const videoConstraints = {
-                    width: 320,
-                    height: 240
+                    width: { ideal: 320 },
+                    height: { ideal: 240 }
                 };
-                // Use selected camera if available
+                // Use selected camera if available (use 'ideal' to avoid OverconstrainedError)
                 if (selectedCameraId) {
-                    videoConstraints.deviceId = { exact: selectedCameraId };
+                    videoConstraints.deviceId = { ideal: selectedCameraId };
                 }
 
                 console.log('Requesting camera with constraints:', videoConstraints);
@@ -787,13 +787,25 @@ const selector = document.getElementById('exerciseSelector');
             const leftAnkle = landmarks[27];
             const rightAnkle = landmarks[28];
 
-            const allVisible = [nose, leftShoulder, rightShoulder, leftHip, rightHip, leftAnkle, rightAnkle]
+            // Check upper body vs lower body visibility separately
+            const upperBodyVisible = [nose, leftShoulder, rightShoulder]
+                .every(p => p && p.visibility > 0.5);
+            const lowerBodyVisible = [leftHip, rightHip, leftAnkle, rightAnkle]
                 .every(p => p && p.visibility > 0.5);
 
-            if (!allVisible) {
-                // Only update the message once to avoid interfering with link clicks
+            if (!upperBodyVisible) {
+                // Can't see upper body - they're too close to camera
                 if (!shownStepBackMessage) {
-                    document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    document.getElementById('status').innerHTML = 'Step back so the camera can see you<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    shownStepBackMessage = true;
+                }
+                return false;
+            }
+
+            if (!lowerBodyVisible) {
+                // Upper body visible but lower body not - likely seated
+                if (!shownStepBackMessage) {
+                    document.getElementById('status').innerHTML = 'Looks like you\'re seated!<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;"><strong>Try a seated exercise →</strong></a>';
                     shownStepBackMessage = true;
                 }
                 return false;
@@ -1909,9 +1921,9 @@ const selector = document.getElementById('exerciseSelector');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        width: 320,
-                        height: 240,
-                        deviceId: { exact: deviceId }
+                        width: { ideal: 320 },
+                        height: { ideal: 240 },
+                        deviceId: { ideal: deviceId }
                     }
                 });
                 video.srcObject = stream;
