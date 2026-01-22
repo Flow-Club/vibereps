@@ -16,6 +16,39 @@ import subprocess
 import urllib.request
 import urllib.error
 
+# Electron app port (different from webapp's 8765-8774 range)
+ELECTRON_PORT = 8800
+ELECTRON_APP_PATH = "/Applications/VibeReps.app"
+
+
+def launch_electron_app() -> bool:
+    """Try to launch the Electron app if installed. Returns True if app started successfully."""
+    if not os.path.exists(ELECTRON_APP_PATH):
+        return False
+
+    try:
+        subprocess.Popen(
+            ["open", ELECTRON_APP_PATH],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        # Wait for app to start (check port directly to avoid circular dependency)
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                req = urllib.request.Request(
+                    f"http://localhost:{ELECTRON_PORT}/api/status",
+                    headers={"Accept": "application/json"}
+                )
+                response = urllib.request.urlopen(req, timeout=1)
+                if response.status == 200:
+                    return True
+            except (urllib.error.URLError, OSError):
+                continue
+        return False
+    except Exception:
+        return False
+
 
 # Handle --list-exercises before anything else
 if len(sys.argv) > 1 and sys.argv[1] in ("--list-exercises", "-l"):
@@ -857,8 +890,15 @@ class ExerciseTrackerHook:
     def handle_hook(self, event_type, data):
         """Main hook handler"""
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
-            # First, check if Electron menubar app is running
-            if is_electron_app_running():
+            # First, check if Electron menubar app is running or can be launched
+            electron_running = is_electron_app_running()
+
+            # If Electron app is installed but not running, try to launch it
+            if not electron_running and os.path.exists(ELECTRON_APP_PATH):
+                if launch_electron_app():
+                    electron_running = True
+
+            if electron_running:
                 # Get or create session ID (persist across hook calls)
                 session_id_file = Path("/tmp/vibereps-session-id")
                 if session_id_file.exists():

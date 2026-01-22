@@ -694,8 +694,9 @@ const selector = document.getElementById('exerciseSelector');
             exerciseState = 'checking';
             startTime = Date.now();
 
-            // Show exercise toggle
+            // Show exercise toggle and hide the exercise selector buttons
             showExerciseToggle(exerciseId);
+            document.getElementById('exerciseSelector').style.display = 'none';
             document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = true);
             document.getElementById('counter').textContent = '?';
 
@@ -1683,6 +1684,7 @@ const selector = document.getElementById('exerciseSelector');
                     setTimeout(() => checkAndContinueOrFinish(), 1500);
                 } else {
                     setTimeout(() => {
+                        document.getElementById('exerciseSelector').style.display = '';
                         document.querySelectorAll('.exercise-selector button').forEach(btn => {
                             btn.disabled = false;
                             btn.classList.remove('active');
