@@ -33,7 +33,9 @@ const exerciseUiPath = isDev
 const exercisesPath = isDev
   ? path.join(resourcesPath, 'exercises')
   : path.join(resourcesPath, 'exercises');
-const mediapipePath = path.join(__dirname, 'assets', 'mediapipe');
+const mediapipePath = isDev
+  ? path.join(__dirname, 'assets', 'mediapipe')
+  : path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'mediapipe');
 const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
 
 // Get today's date in YYYY-MM-DD format

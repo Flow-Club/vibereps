@@ -16,7 +16,11 @@ from pathlib import Path
 PORT_FILE = Path("/tmp/vibereps-port")
 PORT_RANGE = range(8765, 8775)
 ELECTRON_PORT = 8800  # Different from webapp's 8765-8774 range
-SESSION_ID_FILE = Path("/tmp/vibereps-session-id")
+
+
+def get_session_id_file():
+    """Get the per-terminal session ID file path."""
+    return Path(f"/tmp/vibereps-session-id-{os.getppid()}")
 
 
 def read_hook_payload_from_stdin() -> dict:
@@ -44,9 +48,10 @@ def is_electron_app_running():
 
 def get_session_id():
     """Get the current session ID if available."""
-    if SESSION_ID_FILE.exists():
+    session_id_file = get_session_id_file()
+    if session_id_file.exists():
         try:
-            return SESSION_ID_FILE.read_text().strip()
+            return session_id_file.read_text().strip()
         except OSError:
             pass
     return None

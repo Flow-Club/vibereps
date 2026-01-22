@@ -105,9 +105,6 @@ VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 
-# Electron app port (fixed port for the menubar app, outside webapp's 8765-8774 range)
-ELECTRON_PORT = 8800
-
 # Exercises that require legs (filtered out when VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1)
 LEG_EXERCISES = {"squats", "calf_raises", "high_knees", "jumping_jacks"}
 
@@ -899,8 +896,8 @@ class ExerciseTrackerHook:
                     electron_running = True
 
             if electron_running:
-                # Get or create session ID (persist across hook calls)
-                session_id_file = Path("/tmp/vibereps-session-id")
+                # Get or create session ID (persist across hook calls, per-terminal)
+                session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}")
                 if session_id_file.exists():
                     try:
                         session_id = session_id_file.read_text().strip()
