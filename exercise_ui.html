@@ -534,7 +534,8 @@
             <span class="cam-status" id="camStatus"></span>
         </div>
 
-        <div class="exercise-selector" id="exerciseSelector">
+        <!-- Exercise selector hidden - auto-pick on start, switch via dropdown toggle -->
+        <div class="exercise-selector" id="exerciseSelector" style="display: none">
             <div class="loading">Loading exercises...</div>
         </div>
 
@@ -1683,14 +1684,18 @@ const selector = document.getElementById('exerciseSelector');
                     // Check if Claude is done before deciding next action
                     setTimeout(() => checkAndContinueOrFinish(), 1500);
                 } else {
+                    // In normal mode, also pick next exercise automatically
                     setTimeout(() => {
-                        document.getElementById('exerciseSelector').style.display = '';
-                        document.querySelectorAll('.exercise-selector button').forEach(btn => {
-                            btn.disabled = false;
-                            btn.classList.remove('active');
-                        });
-                        exerciseState = null;
-                        document.getElementById('status').textContent = 'Great work! Pick another exercise or finish session.';
+                        const nextExercise = pickNextExercise();
+                        if (nextExercise) {
+                            const exName = exercises[nextExercise].name;
+                            showExerciseToggle(nextExercise);
+                            document.getElementById('status').textContent = `Great work! ${exName} next...`;
+                            setTimeout(() => startWithStandUpCheck(nextExercise), 1000);
+                        } else {
+                            exerciseState = null;
+                            document.getElementById('status').textContent = 'Great work! Use the dropdown to pick another exercise.';
+                        }
                     }, 2000);
                 }
             } else {

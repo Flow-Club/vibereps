@@ -28,6 +28,9 @@ ELECTRON_DMG_URL="https://github.com/Flow-Club/vibereps/releases/latest/download
 # UI mode: electron or webapp (default: prompt user)
 UI_MODE="${VIBEREPS_UI_MODE:-}"
 
+# Trigger mode: prompt (experimental) or edit-only (default: prompt user)
+TRIGGER_MODE="${VIBEREPS_TRIGGER_MODE:-}"
+
 # Check if we're running from an existing clone/dev install
 detect_local_install() {
     if [[ -f "$(dirname "${BASH_SOURCE[0]}")/exercise_tracker.py" ]]; then
@@ -69,6 +72,47 @@ choose_ui_mode() {
             2)
                 UI_MODE="webapp"
                 print_success "Selected: Web Browser"
+                break
+                ;;
+            *)
+                print_warning "Please enter 1 or 2"
+                ;;
+        esac
+    done
+    echo ""
+}
+
+# Prompt user to choose trigger mode
+choose_trigger_mode() {
+    if [[ -n "$TRIGGER_MODE" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "${BLUE}When should exercises trigger?${NC}"
+    echo ""
+    echo -e "  ${YELLOW}1)${NC} ${GREEN}On File Edits${NC} (Recommended)"
+    echo "     Exercises trigger when Claude edits/writes code"
+    echo "     Most reliable - only triggers when actual changes happen"
+    echo ""
+    echo -e "  ${YELLOW}2)${NC} ${GREEN}On Prompt Submit${NC} (Experimental)"
+    echo "     Exercises also trigger when you submit a prompt"
+    echo "     Uses AI to guess if your prompt will result in edits"
+    echo "     Triggers earlier, but may have false positives"
+    echo ""
+
+    while true; do
+        read -p "Enter choice [1/2]: " -n 1 -r choice
+        echo ""
+        case "$choice" in
+            1)
+                TRIGGER_MODE="edit-only"
+                print_success "Selected: On File Edits"
+                break
+                ;;
+            2)
+                TRIGGER_MODE="prompt"
+                print_success "Selected: On Prompt Submit (Experimental)"
                 break
                 ;;
             *)
@@ -241,6 +285,7 @@ from pathlib import Path
 
 settings_file = Path("$SETTINGS_FILE")
 install_dir = "$INSTALL_DIR"
+trigger_mode = "$TRIGGER_MODE"
 
 # Load existing settings or create empty
 if settings_file.exists():
@@ -271,7 +316,7 @@ vibereps_hooks = {
     ],
     "Notification": [
         {
-            "matcher": "",
+            "matcher": "idle_prompt|permission_prompt",
             "hooks": [
                 {
                     "type": "command",
@@ -281,6 +326,20 @@ vibereps_hooks = {
         }
     ]
 }
+
+# Add experimental prompt detection hook if enabled
+if trigger_mode == "prompt":
+    vibereps_hooks["UserPromptSubmit"] = [
+        {
+            "matcher": "",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py user_prompt_submit '{{}}'"
+                }
+            ]
+        }
+    ]
 
 # Remove any existing vibereps hooks first, then add new ones
 for hook_type, hook_configs in vibereps_hooks.items():
@@ -328,6 +387,11 @@ show_summary() {
     else
         echo -e "  ${BLUE}UI Mode:${NC} Web Browser"
     fi
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        echo -e "  ${BLUE}Trigger Mode:${NC} On Prompt Submit (Experimental)"
+    else
+        echo -e "  ${BLUE}Trigger Mode:${NC} On File Edits"
+    fi
     echo -e "  ${BLUE}Scripts location:${NC} $INSTALL_DIR"
     echo ""
     echo -e "  ${GREEN}Next steps:${NC}"
@@ -345,18 +409,32 @@ show_summary() {
         echo -e "    ${YELLOW}1.${NC} Restart Claude Code"
     fi
     echo ""
-    echo -e "  ${BLUE}Hooks:${NC} ✓ Configured (exercises trigger on file edits)"
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        echo -e "  ${BLUE}Hooks:${NC} ✓ Configured (exercises trigger on prompts + file edits)"
+    else
+        echo -e "  ${BLUE}Hooks:${NC} ✓ Configured (exercises trigger on file edits)"
+    fi
     echo ""
     echo -e "  ${BLUE}Customize exercises (optional):${NC}"
     echo -e "    Run ${GREEN}/setup-vibereps${NC} in Claude Code to change exercise types"
     echo ""
     echo -e "  ${BLUE}How it works:${NC}"
-    if [[ "$UI_MODE" == "electron" ]]; then
-        echo "    Claude edits a file → Menubar app shows exercises → You exercise"
-        echo "    → Claude finishes → App notifies you → You return"
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        if [[ "$UI_MODE" == "electron" ]]; then
+            echo "    You submit a prompt → AI guesses if edits likely → Exercises start"
+            echo "    → Claude finishes → App notifies you → You return"
+        else
+            echo "    You submit a prompt → AI guesses if edits likely → Browser opens"
+            echo "    → Claude finishes → Desktop notification → You return"
+        fi
     else
-        echo "    Claude edits a file → Browser opens → You exercise"
-        echo "    → Claude finishes → Desktop notification → You return"
+        if [[ "$UI_MODE" == "electron" ]]; then
+            echo "    Claude edits a file → Menubar app shows exercises → You exercise"
+            echo "    → Claude finishes → App notifies you → You return"
+        else
+            echo "    Claude edits a file → Browser opens → You exercise"
+            echo "    → Claude finishes → Desktop notification → You return"
+        fi
     fi
     echo ""
     echo -e "  ${BLUE}Other commands:${NC}"
@@ -453,16 +531,19 @@ case "${1:-}" in
         echo "Environment variables:"
         echo "  VIBEREPS_INSTALL_DIR    Custom install directory (default: ~/.vibereps)"
         echo "  VIBEREPS_UI_MODE        UI mode: 'electron' or 'webapp' (default: prompt)"
+        echo "  VIBEREPS_TRIGGER_MODE   Trigger mode: 'edit-only' or 'prompt' (default: prompt user)"
+        echo "                          'edit-only' = trigger on file edits only (recommended)"
+        echo "                          'prompt' = also trigger on prompt submit (experimental)"
         echo ""
         echo "Examples:"
         echo "  # Install from GitHub (interactive)"
         echo "  curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash"
         echo ""
         echo "  # Install menubar app non-interactively"
-        echo "  VIBEREPS_UI_MODE=electron ./install.sh"
+        echo "  VIBEREPS_UI_MODE=electron VIBEREPS_TRIGGER_MODE=edit-only ./install.sh"
         echo ""
-        echo "  # Install web browser version non-interactively"
-        echo "  VIBEREPS_UI_MODE=webapp ./install.sh"
+        echo "  # Install with experimental prompt detection"
+        echo "  VIBEREPS_TRIGGER_MODE=prompt ./install.sh"
         echo ""
         echo "  # Uninstall"
         echo "  ~/.vibereps/install.sh --uninstall"
@@ -478,8 +559,9 @@ echo -e "${GREEN}║${NC}       Don't neglect your physical corpus!             
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Ask user for UI preference
+# Ask user for preferences
 choose_ui_mode
+choose_trigger_mode
 
 # Install based on choice
 if [[ "$UI_MODE" == "electron" ]]; then
