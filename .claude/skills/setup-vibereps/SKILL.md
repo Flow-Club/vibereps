@@ -21,7 +21,7 @@ MultiSelect: false
 Options:
 - "Standing & Seated (Recommended)": "Full variety - squats, jumping jacks, plus desk-friendly neck stretches"
 - "Standing only": "Active exercises - squats, jumping jacks, push-ups, calf raises"
-- "Seated only": "Desk-friendly - shoulder shrugs, chin tucks, neck stretches"
+- "Seated only": "Desk-friendly - shoulder shrugs, neck stretches"
 ```
 
 ### Step 2: Ask Which Exercises
@@ -41,7 +41,6 @@ Based on their mode choice, show relevant exercises:
 
 **Seated exercises:**
 - shoulder_shrugs: "Releases neck and shoulder tension"
-- chin_tucks: "Corrects forward head posture (tech neck)"
 - neck_tilts: "Stretches sides of neck"
 - neck_rotations: "Improves neck mobility"
 
@@ -109,7 +108,7 @@ Show a summary:
 ```
 Setup complete!
 
-Selected exercises: squats, jumping_jacks, shoulder_shrugs, chin_tucks
+Selected exercises: squats, jumping_jacks, shoulder_shrugs, neck_rotations
 
 How it works:
 1. Claude edits a file → Exercise tracker launches

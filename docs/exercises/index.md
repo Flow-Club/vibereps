@@ -16,7 +16,6 @@ VibeReps supports multiple exercise types, each using different detection method
 | [Torso Twists](#torso-twists) | Shoulder twist | Easy | Core, mobility |
 | [Arm Circles](#arm-circles) | Wrist tracking | Easy | Shoulders |
 | [Shoulder Shrugs](#shoulder-shrugs) | Shoulder elevation | Easy | Neck, shoulders |
-| [Chin Tucks](#chin-tucks) | Head position | Easy | Posture, neck |
 | [Neck Rotations](#neck-rotations) | Head rotation | Easy | Neck mobility |
 | [Neck Tilts](#neck-tilts) | Head tilt | Easy | Neck stretch |
 
@@ -175,17 +174,6 @@ Uses relative landmark distances:
 - Raise shoulders toward ears
 - Hold briefly at top
 - Release with control
-
----
-
-## Chin Tucks
-
-**Detection**: Head position relative to shoulders (X-axis baseline)
-
-**Tips**:
-- Pull chin straight back (make a "double chin")
-- Keep eyes level, don't tilt head
-- Great for correcting "tech neck" from screen time
 
 ---
 

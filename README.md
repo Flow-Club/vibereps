@@ -149,7 +149,7 @@ Add to `~/.claude/settings.json`:
   - Squats, push-ups, jumping jacks
   - Standing crunches, calf raises, side stretches
   - High knees, torso twists, arm circles
-  - Shoulder shrugs, chin tucks, neck rotations, neck tilts (posture correction)
+  - Shoulder shrugs, neck rotations, neck tilts (posture correction)
 - **Two modes:**
   - Quick mode: Keep exercising while Claude works ⚡
   - Normal mode: 10+ reps for breaks
