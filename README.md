@@ -4,6 +4,9 @@ Don't neglect your physical corpus while Opus generates.
 
 Turn model generation time into movement.
 
+> "It's the era of tending to your Claudes."
+> — [Boris Cherny](https://x.com/bcherny), creator of Claude Code, on [Greg Isenberg's podcast](https://x.com/gregisenberg)
+
 <p align="center">
   <img src="assets/xkcd_waiting_for_claude.png" alt="xkcd: Waiting for Claude" width="500">
   <br>
