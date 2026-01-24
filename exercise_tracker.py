@@ -1019,8 +1019,13 @@ class ExerciseTrackerHook:
                     electron_running = True
 
             if electron_running:
-                # Get or create session ID (persist across hook calls, per-terminal)
-                session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}")
+                # Get or create session ID (persist across hook calls, per-terminal and cwd)
+                # Include cwd hash to differentiate multiple Claude instances in same parent
+                cwd_hash = ""
+                if data and data.get("cwd"):
+                    import hashlib
+                    cwd_hash = f"-{hashlib.md5(data['cwd'].encode()).hexdigest()[:8]}"
+                session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
                 if session_id_file.exists():
                     try:
                         session_id = session_id_file.read_text().strip()

@@ -5,7 +5,9 @@ This script is triggered by the Notification hook
 """
 
 import sys
+import os
 import json
+import hashlib
 import urllib.request
 import urllib.error
 import select
@@ -18,9 +20,13 @@ PORT_RANGE = range(8765, 8775)
 ELECTRON_PORT = 8800  # Different from webapp's 8765-8774 range
 
 
-def get_session_id_file():
+def get_session_id_file(cwd: str = None):
     """Get the per-terminal session ID file path."""
-    return Path(f"/tmp/vibereps-session-id-{os.getppid()}")
+    # Include cwd hash to differentiate multiple Claude instances in same parent
+    cwd_hash = ""
+    if cwd:
+        cwd_hash = f"-{hashlib.md5(cwd.encode()).hexdigest()[:8]}"
+    return Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
 
 
 def read_hook_payload_from_stdin() -> dict:
@@ -46,9 +52,9 @@ def is_electron_app_running():
         return False
 
 
-def get_session_id():
+def get_session_id(cwd: str = None):
     """Get the current session ID if available."""
-    session_id_file = get_session_id_file()
+    session_id_file = get_session_id_file(cwd)
     if session_id_file.exists():
         try:
             return session_id_file.read_text().strip()
@@ -61,7 +67,9 @@ def notify_electron_app(notification_data: dict = None):
     """Send notification to Electron menubar app."""
     url = f"http://localhost:{ELECTRON_PORT}/api/notify"
 
-    payload = {"session_id": get_session_id()}
+    # Get cwd from notification data to find correct session ID
+    cwd = notification_data.get("cwd") if notification_data else None
+    payload = {"session_id": get_session_id(cwd)}
     if notification_data:
         payload["message"] = notification_data.get("message", "Claude finished!")
         payload["notification_type"] = notification_data.get("notification_type", "")
