@@ -1,0 +1,24 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Mac Menu Bar Template:
+    - Solid Black (#000000) for content.
+    - Transparent background.
+    - macOS uses the alpha channel to tint this white/blue automatically.
+  -->
+
+  <g transform="translate(6, 20)">
+    <!-- Handle -->
+    <rect x="18" y="26" width="44" height="8" rx="4" fill="#000000"/>
+
+    <!-- Left Weight: Opening Curly Brace -->
+    <path d="M24 6C24 6 10 6 10 22C10 26 10 26 2 30C10 34 10 34 10 38C10 54 24 54 24 54"
+          stroke="#000000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Weight: Closing Curly Brace -->
+    <path d="M56 6C56 6 70 6 70 22C70 26 70 26 78 30C70 34 70 34 70 38C70 54 56 54 56 54"
+          stroke="#000000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Cursor: Solid block for the template -->
+    <rect x="84" y="46" width="12" height="8" fill="#000000"/>
+  </g>
+</svg>
