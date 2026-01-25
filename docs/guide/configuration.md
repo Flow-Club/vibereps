@@ -23,7 +23,6 @@ Available exercises:
 - `torso_twists` - Shoulder twist tracking
 - `arm_circles` - Wrist position tracking
 - `shoulder_shrugs` - Shoulder elevation tracking
-- `chin_tucks` - Head position tracking (posture correction)
 - `neck_rotations` - Head rotation tracking (neck mobility)
 - `neck_tilts` - Head tilt tracking (neck stretch)
 

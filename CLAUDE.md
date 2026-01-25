@@ -120,7 +120,6 @@ For position-based exercises, the "reset" threshold is typically 30-40% of the t
 | Torso Twists | Shoulder twist | Center | > threshold |
 | Arm Circles | Wrist angle | Quadrant tracking | Full circle |
 | Shoulder Shrugs | Shoulder elevation | Baseline | > threshold |
-| Chin Tucks | Head position | Baseline | > 0.02 (x-axis) |
 | Neck Rotations | Head rotation | Center | > threshold |
 | Neck Tilts | Head tilt | Center | > threshold |
 

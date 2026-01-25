@@ -1,0 +1,75 @@
+{
+  "name": "vibereps",
+  "productName": "VibeReps",
+  "version": "1.0.0",
+  "description": "Exercise tracking menubar app for Claude Code",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac dir",
+    "build:dmg": "electron-builder --mac dmg",
+    "build:all": "electron-builder --mac dmg zip",
+    "setup": "./install-standalone.sh",
+    "download-mediapipe": "node scripts/download-mediapipe.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "menubar": "^9.4.0",
+    "express": "^4.18.2"
+  },
+  "build": {
+    "appId": "com.vibereps.app",
+    "productName": "VibeReps",
+    "mac": {
+      "category": "public.app-category.healthcare-fitness",
+      "icon": "assets/icon.icns",
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "VibeReps needs camera access for exercise pose detection",
+        "NSMicrophoneUsageDescription": "VibeReps may request microphone access for media features"
+      }
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 400
+      }
+    },
+    "files": [
+      "**/*",
+      "!scripts/**",
+      "!install.sh"
+    ],
+    "extraResources": [
+      {
+        "from": "../exercise_ui.html",
+        "to": "exercise_ui.html"
+      },
+      {
+        "from": "../exercises",
+        "to": "exercises"
+      }
+    ],
+    "asarUnpack": [
+      "assets/mediapipe/**"
+    ]
+  }
+}

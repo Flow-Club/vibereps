@@ -51,3 +51,9 @@ Thumbs.db
 node_modules/
 package-lock.json
 dist/
+
+# Electron build artifacts
+electron/out/
+
+# MediaPipe models (downloaded via npm run download-mediapipe)
+electron/assets/mediapipe/

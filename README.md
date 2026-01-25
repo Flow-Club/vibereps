@@ -4,6 +4,9 @@ Don't neglect your physical corpus while Opus generates.
 
 Turn model generation time into movement.
 
+> "It's the era of tending to your Claudes."
+> — [Boris Cherny](https://x.com/bcherny), creator of Claude Code, on [Greg Isenberg's podcast](https://x.com/gregisenberg)
+
 <p align="center">
   <img src="assets/xkcd_waiting_for_claude.png" alt="xkcd: Waiting for Claude" width="500">
   <br>
@@ -37,6 +40,49 @@ cd vibereps
 ```bash
 ~/.vibereps/install.sh --uninstall
 ```
+
+</details>
+
+---
+
+## 🖥️ Menubar App (Electron)
+
+For a more integrated experience, use the **VibeReps menubar app**:
+
+- Always-on menubar presence with exercise/usage stats
+- Random exercise auto-selection
+- Native desktop notifications
+- Multi-instance Claude session tracking
+- Works offline (bundled MediaPipe)
+
+### Install Menubar App
+
+```bash
+cd electron
+./install.sh
+```
+
+This will:
+1. Build the native macOS app
+2. Install to /Applications
+3. Optionally configure Claude Code hooks
+
+Or build a distributable DMG:
+```bash
+cd electron
+npm install
+npm run build:dmg
+# Output: electron/dist/VibeReps-1.0.0.dmg
+```
+
+<details>
+<summary><b>Menubar App Features</b></summary>
+
+- **Stats in menu**: Today's reps and Claude Code usage at a glance
+- **Auto-refresh**: Stats update after each exercise
+- **Random exercise**: Opens with a random exercise (quick mode)
+- **Session tracking**: Tracks multiple Claude instances
+- **Start at login**: Add to Login Items for always-on tracking
 
 </details>
 
@@ -106,7 +152,7 @@ Add to `~/.claude/settings.json`:
   - Squats, push-ups, jumping jacks
   - Standing crunches, calf raises, side stretches
   - High knees, torso twists, arm circles
-  - Shoulder shrugs, chin tucks, neck rotations, neck tilts (posture correction)
+  - Shoulder shrugs, neck rotations, neck tilts (posture correction)
 - **Two modes:**
   - Quick mode: Keep exercising while Claude works ⚡
   - Normal mode: 10+ reps for breaks
@@ -116,10 +162,17 @@ Add to `~/.claude/settings.json`:
 
 ## 📋 Requirements
 
+**Browser Version:**
 - Python 3 (standard library only!)
 - Modern web browser (Chrome, Firefox, Safari)
 - Webcam
 - Internet connection (for MediaPipe CDN)
+
+**Menubar App (Electron):**
+- macOS 10.15+
+- Node.js 18+ (for building)
+- Webcam
+- No internet required (MediaPipe bundled)
 
 ## 🔧 Configuration
 
@@ -201,6 +254,16 @@ which python3  # Use this path if needed
 - Grant notification permission when prompted
 - Check browser notification settings
 - Check system notification preferences
+
+**Menubar app camera not working?**
+- Check System Settings > Privacy & Security > Camera
+- Ensure VibeReps has camera permission
+- Try: `tccutil reset Camera com.vibereps.app`
+
+**Menubar app not showing stats?**
+- Click "Refresh Stats" in the menu
+- Ensure exercises are being logged to `~/.vibereps/exercises.jsonl`
+- For Claude usage, ensure `ccusage` is installed: `npm install -g ccusage`
 
 ## 🤖 Claude Code Skills
 
