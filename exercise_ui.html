@@ -534,7 +534,8 @@
             <span class="cam-status" id="camStatus"></span>
         </div>
 
-        <div class="exercise-selector" id="exerciseSelector">
+        <!-- Exercise selector hidden - auto-pick on start, switch via dropdown toggle -->
+        <div class="exercise-selector" id="exerciseSelector" style="display: none">
             <div class="loading">Loading exercises...</div>
         </div>
 
@@ -694,8 +695,9 @@ const selector = document.getElementById('exerciseSelector');
             exerciseState = 'checking';
             startTime = Date.now();
 
-            // Show exercise toggle
+            // Show exercise toggle and hide the exercise selector buttons
             showExerciseToggle(exerciseId);
+            document.getElementById('exerciseSelector').style.display = 'none';
             document.querySelectorAll('.exercise-selector button').forEach(btn => btn.disabled = true);
             document.getElementById('counter').textContent = '?';
 
@@ -732,12 +734,12 @@ const selector = document.getElementById('exerciseSelector');
                 }
 
                 const videoConstraints = {
-                    width: 320,
-                    height: 240
+                    width: { ideal: 320 },
+                    height: { ideal: 240 }
                 };
-                // Use selected camera if available
+                // Use selected camera if available (use 'ideal' to avoid OverconstrainedError)
                 if (selectedCameraId) {
-                    videoConstraints.deviceId = { exact: selectedCameraId };
+                    videoConstraints.deviceId = { ideal: selectedCameraId };
                 }
 
                 console.log('Requesting camera with constraints:', videoConstraints);
@@ -787,13 +789,25 @@ const selector = document.getElementById('exerciseSelector');
             const leftAnkle = landmarks[27];
             const rightAnkle = landmarks[28];
 
-            const allVisible = [nose, leftShoulder, rightShoulder, leftHip, rightHip, leftAnkle, rightAnkle]
+            // Check upper body vs lower body visibility separately
+            const upperBodyVisible = [nose, leftShoulder, rightShoulder]
+                .every(p => p && p.visibility > 0.5);
+            const lowerBodyVisible = [leftHip, rightHip, leftAnkle, rightAnkle]
                 .every(p => p && p.visibility > 0.5);
 
-            if (!allVisible) {
-                // Only update the message once to avoid interfering with link clicks
+            if (!upperBodyVisible) {
+                // Can't see upper body - they're too close to camera
                 if (!shownStepBackMessage) {
-                    document.getElementById('status').innerHTML = 'Step back - need to see your full body (head to feet)<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    document.getElementById('status').innerHTML = 'Step back so the camera can see you<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;">or try seated exercises →</a>';
+                    shownStepBackMessage = true;
+                }
+                return false;
+            }
+
+            if (!lowerBodyVisible) {
+                // Upper body visible but lower body not - likely seated
+                if (!shownStepBackMessage) {
+                    document.getElementById('status').innerHTML = 'Looks like you\'re seated!<br><a href="#" class="seated-link" onclick="switchToSeatedExercise(); return false;"><strong>Try a seated exercise →</strong></a>';
                     shownStepBackMessage = true;
                 }
                 return false;
@@ -1670,13 +1684,18 @@ const selector = document.getElementById('exerciseSelector');
                     // Check if Claude is done before deciding next action
                     setTimeout(() => checkAndContinueOrFinish(), 1500);
                 } else {
+                    // In normal mode, also pick next exercise automatically
                     setTimeout(() => {
-                        document.querySelectorAll('.exercise-selector button').forEach(btn => {
-                            btn.disabled = false;
-                            btn.classList.remove('active');
-                        });
-                        exerciseState = null;
-                        document.getElementById('status').textContent = 'Great work! Pick another exercise or finish session.';
+                        const nextExercise = pickNextExercise();
+                        if (nextExercise) {
+                            const exName = exercises[nextExercise].name;
+                            showExerciseToggle(nextExercise);
+                            document.getElementById('status').textContent = `Great work! ${exName} next...`;
+                            setTimeout(() => startWithStandUpCheck(nextExercise), 1000);
+                        } else {
+                            exerciseState = null;
+                            document.getElementById('status').textContent = 'Great work! Use the dropdown to pick another exercise.';
+                        }
                     }, 2000);
                 }
             } else {
@@ -1909,9 +1928,9 @@ const selector = document.getElementById('exerciseSelector');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        width: 320,
-                        height: 240,
-                        deviceId: { exact: deviceId }
+                        width: { ideal: 320 },
+                        height: { ideal: 240 },
+                        deviceId: { ideal: deviceId }
                     }
                 });
                 video.srcObject = stream;

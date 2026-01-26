@@ -1,6 +1,7 @@
 #!/bin/bash
 #
 # VibeReps Installer for Claude Code
+# Test edit - exercise buttons should now collapse
 # One-liner install: curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 #
 
@@ -22,6 +23,13 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 INSTALL_DIR="${VIBEREPS_INSTALL_DIR:-$HOME/.vibereps}"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 RELEASE_URL="https://github.com/Flow-Club/vibereps/releases/latest/download/vibereps.tar.gz"
+ELECTRON_DMG_URL="https://github.com/Flow-Club/vibereps/releases/latest/download/VibeReps.dmg"
+
+# UI mode: electron or webapp (default: prompt user)
+UI_MODE="${VIBEREPS_UI_MODE:-}"
+
+# Trigger mode: prompt (experimental) or edit-only (default: prompt user)
+TRIGGER_MODE="${VIBEREPS_TRIGGER_MODE:-}"
 
 # Check if we're running from an existing clone/dev install
 detect_local_install() {
@@ -32,7 +40,183 @@ detect_local_install() {
     return 1
 }
 
-# Install or update vibereps
+# Prompt user to choose UI mode
+choose_ui_mode() {
+    if [[ -n "$UI_MODE" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "${BLUE}Choose your preferred UI:${NC}"
+    echo ""
+    echo -e "  ${YELLOW}1)${NC} ${GREEN}Menubar App${NC} (Recommended)"
+    echo "     macOS (Electron) app that lives in your menu bar"
+    echo "     Exercises appear in a small overlay window"
+    echo "     More reliable window opening and notifications"
+    echo ""
+    echo -e "  ${YELLOW}2)${NC} ${GREEN}Web Browser${NC}"
+    echo "     Opens in your default browser"
+    echo "     No additional apps installed"
+    echo "     Lighter weight, but less reliable window opening experience"
+    echo ""
+
+    while true; do
+        read -p "Enter choice [1/2]: " -n 1 -r choice
+        echo ""
+        case "$choice" in
+            1)
+                UI_MODE="electron"
+                print_success "Selected: Menubar App"
+                break
+                ;;
+            2)
+                UI_MODE="webapp"
+                print_success "Selected: Web Browser"
+                break
+                ;;
+            *)
+                print_warning "Please enter 1 or 2"
+                ;;
+        esac
+    done
+    echo ""
+}
+
+# Prompt user to choose trigger mode
+choose_trigger_mode() {
+    if [[ -n "$TRIGGER_MODE" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "${BLUE}When should exercises trigger?${NC}"
+    echo ""
+    echo -e "  ${YELLOW}1)${NC} ${GREEN}On File Edits${NC} (Recommended)"
+    echo "     Exercises trigger when Claude edits/writes code"
+    echo "     Most reliable - only triggers when actual changes happen"
+    echo ""
+    echo -e "  ${YELLOW}2)${NC} ${GREEN}On Prompt Submit${NC} (Experimental)"
+    echo "     Exercises also trigger when you submit a prompt"
+    echo "     Uses AI to guess if your prompt will result in edits"
+    echo "     Triggers earlier, but may have false positives"
+    echo ""
+
+    while true; do
+        read -p "Enter choice [1/2]: " -n 1 -r choice
+        echo ""
+        case "$choice" in
+            1)
+                TRIGGER_MODE="edit-only"
+                print_success "Selected: On File Edits"
+                break
+                ;;
+            2)
+                TRIGGER_MODE="prompt"
+                print_success "Selected: On Prompt Submit (Experimental)"
+                break
+                ;;
+            *)
+                print_warning "Please enter 1 or 2"
+                ;;
+        esac
+    done
+    echo ""
+}
+
+# Install Electron menubar app
+install_electron_app() {
+    print_step "Installing VibeReps Menubar App"
+
+    # Check if running from local clone with electron directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -d "$SCRIPT_DIR/electron" ]] && [[ -f "$SCRIPT_DIR/electron/package.json" ]]; then
+        print_step "Building from source..."
+
+        # Check for Node.js
+        if ! command -v node &> /dev/null; then
+            print_error "Node.js is required to build the Electron app"
+            echo "Install it from https://nodejs.org/ or via: brew install node"
+            echo ""
+            print_warning "Falling back to web browser mode..."
+            UI_MODE="webapp"
+            return 1
+        fi
+
+        # Build and install
+        cd "$SCRIPT_DIR/electron"
+        print_step "Installing npm dependencies..."
+        npm install --silent 2>/dev/null || npm install
+
+        print_step "Building app..."
+        npm run build --silent 2>/dev/null || npm run build
+
+        # Determine architecture
+        ARCH=$(uname -m)
+        if [[ "$ARCH" = "arm64" ]]; then
+            APP_PATH="dist/mac-arm64/VibeReps.app"
+        else
+            APP_PATH="dist/mac/VibeReps.app"
+        fi
+
+        if [[ ! -d "$APP_PATH" ]]; then
+            print_error "Build failed - $APP_PATH not found"
+            print_warning "Falling back to web browser mode..."
+            UI_MODE="webapp"
+            cd "$SCRIPT_DIR"
+            return 1
+        fi
+
+        # Install to /Applications
+        if [[ -d "/Applications/VibeReps.app" ]]; then
+            print_step "Removing old version..."
+            rm -rf "/Applications/VibeReps.app"
+        fi
+
+        cp -r "$APP_PATH" /Applications/
+        print_success "Installed to /Applications/VibeReps.app"
+
+        cd "$SCRIPT_DIR"
+    else
+        # Download pre-built DMG from releases
+        print_step "Downloading VibeReps.dmg..."
+
+        TEMP_DIR=$(mktemp -d)
+        TEMP_DMG="$TEMP_DIR/VibeReps.dmg"
+        if curl -sSL -o "$TEMP_DMG" "$ELECTRON_DMG_URL" 2>/dev/null; then
+            print_success "Downloaded DMG"
+        else
+            print_error "Failed to download Electron app."
+            print_warning "Falling back to web browser mode..."
+            UI_MODE="webapp"
+            return 1
+        fi
+
+        # Mount and copy
+        print_step "Installing app..."
+        MOUNT_POINT=$(mktemp -d)
+        if hdiutil attach "$TEMP_DMG" -mountpoint "$MOUNT_POINT" -quiet 2>/dev/null; then
+            if [[ -d "/Applications/VibeReps.app" ]]; then
+                rm -rf "/Applications/VibeReps.app"
+            fi
+
+            cp -r "$MOUNT_POINT/VibeReps.app" /Applications/
+            hdiutil detach "$MOUNT_POINT" -quiet
+            rm -rf "$TEMP_DIR"
+
+            print_success "Installed to /Applications/VibeReps.app"
+        else
+            print_error "Failed to mount DMG"
+            print_warning "Falling back to web browser mode..."
+            rm -rf "$TEMP_DIR"
+            UI_MODE="webapp"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# Install or update vibereps (webapp version)
 install_vibereps() {
     if detect_local_install; then
         print_step "Using local installation at $INSTALL_DIR"
@@ -101,6 +285,7 @@ from pathlib import Path
 
 settings_file = Path("$SETTINGS_FILE")
 install_dir = "$INSTALL_DIR"
+trigger_mode = "$TRIGGER_MODE"
 
 # Load existing settings or create empty
 if settings_file.exists():
@@ -131,7 +316,7 @@ vibereps_hooks = {
     ],
     "Notification": [
         {
-            "matcher": "",
+            "matcher": "idle_prompt|permission_prompt",
             "hooks": [
                 {
                     "type": "command",
@@ -142,32 +327,41 @@ vibereps_hooks = {
     ]
 }
 
-# Add vibereps hooks (preserving existing hooks)
+# Add experimental prompt detection hook if enabled
+if trigger_mode == "prompt":
+    vibereps_hooks["UserPromptSubmit"] = [
+        {
+            "matcher": "",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py user_prompt_submit '{{}}'"
+                }
+            ]
+        }
+    ]
+
+# Remove any existing vibereps hooks first, then add new ones
 for hook_type, hook_configs in vibereps_hooks.items():
     if hook_type not in settings["hooks"]:
         settings["hooks"][hook_type] = []
 
-    # Check if vibereps hook already exists
-    existing_commands = [
-        h.get("command", "") if isinstance(h, dict) else ""
-        for h in settings["hooks"][hook_type]
-    ]
-    # Also check nested hooks
-    for h in settings["hooks"][hook_type]:
-        if isinstance(h, dict) and "hooks" in h:
-            for nested in h["hooks"]:
-                if isinstance(nested, dict):
-                    existing_commands.append(nested.get("command", ""))
+    # Filter out old vibereps hooks
+    def is_vibereps_hook(h):
+        if isinstance(h, dict):
+            if "exercise_tracker.py" in str(h) or "notify_complete.py" in str(h):
+                return True
+            if "hooks" in h:
+                for nested in h["hooks"]:
+                    if isinstance(nested, dict) and ("exercise_tracker.py" in str(nested) or "notify_complete.py" in str(nested)):
+                        return True
+        return False
 
+    settings["hooks"][hook_type] = [h for h in settings["hooks"][hook_type] if not is_vibereps_hook(h)]
+
+    # Add the new hooks
     for hook_config in hook_configs:
-        # Check if this hook's command already exists
-        if isinstance(hook_config, dict) and "hooks" in hook_config:
-            cmd = hook_config["hooks"][0].get("command", "")
-        else:
-            cmd = hook_config.get("command", "")
-
-        if not any("exercise_tracker.py" in c or "notify_complete.py" in c for c in existing_commands):
-            settings["hooks"][hook_type].append(hook_config)
+        settings["hooks"][hook_type].append(hook_config)
 
 # Write updated settings
 with open(settings_file, "w") as f:
@@ -186,20 +380,62 @@ show_summary() {
     echo -e "${GREEN}║${NC}           ${GREEN}VibeReps installed successfully!${NC}               ${GREEN}║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${BLUE}Install location:${NC} $INSTALL_DIR"
+
+    if [[ "$UI_MODE" == "electron" ]]; then
+        echo -e "  ${BLUE}UI Mode:${NC} Menubar App"
+        echo -e "  ${BLUE}App location:${NC} /Applications/VibeReps.app"
+    else
+        echo -e "  ${BLUE}UI Mode:${NC} Web Browser"
+    fi
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        echo -e "  ${BLUE}Trigger Mode:${NC} On Prompt Submit (Experimental)"
+    else
+        echo -e "  ${BLUE}Trigger Mode:${NC} On File Edits"
+    fi
+    echo -e "  ${BLUE}Scripts location:${NC} $INSTALL_DIR"
     echo ""
     echo -e "  ${GREEN}Next steps:${NC}"
     echo ""
-    echo -e "    ${YELLOW}1.${NC} Restart Claude Code"
+
+    if [[ "$UI_MODE" == "electron" ]]; then
+        echo -e "    ${YELLOW}1.${NC} Launch the menubar app:"
+        echo "       open /Applications/VibeReps.app"
+        echo ""
+        echo -e "    ${YELLOW}2.${NC} (Optional) Start at login:"
+        echo "       System Settings → General → Login Items → Add VibeReps"
+        echo ""
+        echo -e "    ${YELLOW}3.${NC} Restart Claude Code"
+    else
+        echo -e "    ${YELLOW}1.${NC} Restart Claude Code"
+    fi
     echo ""
-    echo -e "    ${YELLOW}2.${NC} Run ${GREEN}/setup-vibereps${NC} in Claude Code to:"
-    echo "       • Choose standing, seated, or both exercise types"
-    echo "       • Pick which exercises you want"
-    echo "       • Learn how to add custom exercises"
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        echo -e "  ${BLUE}Hooks:${NC} ✓ Configured (exercises trigger on prompts + file edits)"
+    else
+        echo -e "  ${BLUE}Hooks:${NC} ✓ Configured (exercises trigger on file edits)"
+    fi
+    echo ""
+    echo -e "  ${BLUE}Customize exercises (optional):${NC}"
+    echo -e "    Run ${GREEN}/setup-vibereps${NC} in Claude Code to change exercise types"
     echo ""
     echo -e "  ${BLUE}How it works:${NC}"
-    echo "    Claude edits a file → Exercise tracker launches → You exercise"
-    echo "    → Claude finishes → Desktop notification → You return"
+    if [[ "$TRIGGER_MODE" == "prompt" ]]; then
+        if [[ "$UI_MODE" == "electron" ]]; then
+            echo "    You submit a prompt → AI guesses if edits likely → Exercises start"
+            echo "    → Claude finishes → App notifies you → You return"
+        else
+            echo "    You submit a prompt → AI guesses if edits likely → Browser opens"
+            echo "    → Claude finishes → Desktop notification → You return"
+        fi
+    else
+        if [[ "$UI_MODE" == "electron" ]]; then
+            echo "    Claude edits a file → Menubar app shows exercises → You exercise"
+            echo "    → Claude finishes → App notifies you → You return"
+        else
+            echo "    Claude edits a file → Browser opens → You exercise"
+            echo "    → Claude finishes → Desktop notification → You return"
+        fi
+    fi
     echo ""
     echo -e "  ${BLUE}Other commands:${NC}"
     echo "    /test-tracker    - Test the exercise tracker"
@@ -253,6 +489,16 @@ PYTHON_SCRIPT
         print_success "Removed hooks from Claude Code settings"
     fi
 
+    # Remove Electron app if installed
+    if [[ -d "/Applications/VibeReps.app" ]]; then
+        read -p "Remove /Applications/VibeReps.app? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "/Applications/VibeReps.app"
+            print_success "Removed /Applications/VibeReps.app"
+        fi
+    fi
+
     # Optionally remove install directory
     if [[ -d "$INSTALL_DIR" ]] && [[ "$INSTALL_DIR" == "$HOME/.vibereps" ]]; then
         read -p "Remove $INSTALL_DIR? [y/N] " -n 1 -r
@@ -284,13 +530,20 @@ case "${1:-}" in
         echo ""
         echo "Environment variables:"
         echo "  VIBEREPS_INSTALL_DIR    Custom install directory (default: ~/.vibereps)"
+        echo "  VIBEREPS_UI_MODE        UI mode: 'electron' or 'webapp' (default: prompt)"
+        echo "  VIBEREPS_TRIGGER_MODE   Trigger mode: 'edit-only' or 'prompt' (default: prompt user)"
+        echo "                          'edit-only' = trigger on file edits only (recommended)"
+        echo "                          'prompt' = also trigger on prompt submit (experimental)"
         echo ""
         echo "Examples:"
-        echo "  # Install from GitHub"
+        echo "  # Install from GitHub (interactive)"
         echo "  curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash"
         echo ""
-        echo "  # Install to custom directory"
-        echo "  VIBEREPS_INSTALL_DIR=/opt/vibereps ./install.sh"
+        echo "  # Install menubar app non-interactively"
+        echo "  VIBEREPS_UI_MODE=electron VIBEREPS_TRIGGER_MODE=edit-only ./install.sh"
+        echo ""
+        echo "  # Install with experimental prompt detection"
+        echo "  VIBEREPS_TRIGGER_MODE=prompt ./install.sh"
         echo ""
         echo "  # Uninstall"
         echo "  ~/.vibereps/install.sh --uninstall"
@@ -306,7 +559,23 @@ echo -e "${GREEN}║${NC}       Don't neglect your physical corpus!             
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-install_vibereps
+# Ask user for preferences
+choose_ui_mode
+choose_trigger_mode
+
+# Install based on choice
+if [[ "$UI_MODE" == "electron" ]]; then
+    if install_electron_app; then
+        # Electron install succeeded, still need webapp files for hooks
+        install_vibereps
+    else
+        # Fallback happened, UI_MODE is now webapp
+        install_vibereps
+    fi
+else
+    install_vibereps
+fi
+
 setup_permissions
 backup_settings
 configure_hooks

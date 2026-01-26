@@ -4,6 +4,9 @@ Don't neglect your physical corpus while Opus generates.
 
 Turn model generation time into movement.
 
+> "It's the era of tending to your Claudes."
+> — [Boris Cherny](https://x.com/bcherny), creator of Claude Code, on [Greg Isenberg's podcast](https://x.com/gregisenberg)
+
 <p align="center">
   <img src="assets/xkcd_waiting_for_claude.png" alt="xkcd: Waiting for Claude" width="500">
   <br>
@@ -149,7 +152,7 @@ Add to `~/.claude/settings.json`:
   - Squats, push-ups, jumping jacks
   - Standing crunches, calf raises, side stretches
   - High knees, torso twists, arm circles
-  - Shoulder shrugs, chin tucks, neck rotations, neck tilts (posture correction)
+  - Shoulder shrugs, neck rotations, neck tilts (posture correction)
 - **Two modes:**
   - Quick mode: Keep exercising while Claude works ⚡
   - Normal mode: 10+ reps for breaks

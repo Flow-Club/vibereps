@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `vibereps-usage.py` for combined Claude Code + exercise stats
 - `config.json` with array of taglines
 - 11 exercise types with JSON-based configuration
-- Chin tucks exercise for posture correction
 
 ### Changed
 - Exercise configs moved from hardcoded JS to `exercises/*.json`

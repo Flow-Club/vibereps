@@ -16,6 +16,63 @@ import subprocess
 import urllib.request
 import urllib.error
 
+# Electron app port (different from webapp's 8765-8774 range)
+ELECTRON_PORT = 8800
+ELECTRON_APP_PATH = "/Applications/VibeReps.app"
+
+
+def launch_electron_app() -> bool:
+    """Try to launch the Electron app if installed. Returns True if app started successfully."""
+    if not os.path.exists(ELECTRON_APP_PATH):
+        return False
+
+    # Use lock file to prevent multiple simultaneous launch attempts
+    lock_file = Path("/tmp/vibereps-electron-launch.lock")
+    try:
+        fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+    except FileExistsError:
+        # Another process is launching, check if stale (> 15s)
+        try:
+            if time.time() - lock_file.stat().st_mtime < 15:
+                # Wait for other process to finish launching
+                for _ in range(10):
+                    time.sleep(0.5)
+                    if is_electron_app_running():
+                        return True
+                return False
+            lock_file.unlink(missing_ok=True)
+        except (OSError, FileNotFoundError):
+            pass
+        return False
+
+    try:
+        subprocess.Popen(
+            ["open", ELECTRON_APP_PATH],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        # Wait for app to start (check port directly to avoid circular dependency)
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                req = urllib.request.Request(
+                    f"http://localhost:{ELECTRON_PORT}/api/status",
+                    headers={"Accept": "application/json"}
+                )
+                response = urllib.request.urlopen(req, timeout=1)
+                if response.status == 200:
+                    lock_file.unlink(missing_ok=True)
+                    return True
+            except (urllib.error.URLError, OSError):
+                continue
+        lock_file.unlink(missing_ok=True)
+        return False
+    except Exception:
+        lock_file.unlink(missing_ok=True)
+        return False
+
 
 # Handle --list-exercises before anything else
 if len(sys.argv) > 1 and sys.argv[1] in ("--list-exercises", "-l"):
@@ -87,6 +144,93 @@ def get_filtered_exercises():
         exercise_list = [e for e in exercise_list if e not in LEG_EXERCISES]
         exercises = ",".join(exercise_list)
     return exercises
+
+
+# Action words that suggest a prompt will result in code edits
+EDIT_ACTION_WORDS = {
+    # Direct edit commands
+    "fix", "add", "update", "change", "implement", "create", "write", "make",
+    "modify", "edit", "refactor", "rename", "move", "delete", "remove",
+    "replace", "insert", "append", "prepend",
+    # Feature/task words
+    "build", "develop", "code", "program", "script",
+    "feature", "function", "method", "class", "component",
+    # Bug/issue words
+    "bug", "error", "issue", "problem", "broken",
+    # Improvement words
+    "improve", "optimize", "enhance", "upgrade", "migrate",
+    # Integration words
+    "integrate", "connect", "hook", "wire", "link",
+    # Test words (often involve writing code)
+    "test", "spec",
+}
+
+# Words that suggest the prompt is just a question (skip exercise)
+QUESTION_WORDS = {
+    "what", "why", "how", "where", "when", "which", "who",
+    "explain", "describe", "tell", "show", "list", "find",
+    "search", "look", "check", "verify", "confirm",
+    "understand", "learn", "help", "?",
+}
+
+
+def prompt_likely_to_edit(prompt: str) -> bool:
+    """
+    Analyze a prompt to guess if it will result in code edits.
+    Returns True if we think edits are likely, False otherwise.
+    """
+    if not prompt:
+        return False
+
+    prompt_lower = prompt.lower().strip()
+    words = set(prompt_lower.split())
+
+    # Check for explicit action words (strong signals for editing)
+    strong_action_words = {
+        "fix", "add", "update", "change", "implement", "create", "write", "make",
+        "modify", "edit", "refactor", "rename", "delete", "remove", "replace",
+        "build", "develop", "integrate", "migrate", "improve", "optimize",
+    }
+    has_strong_action = bool(words & strong_action_words)
+
+    # Check if it starts with a question word (strong signal for NOT editing)
+    first_word = prompt_lower.split()[0] if prompt_lower else ""
+    starts_with_question = first_word in {"what", "why", "how", "where", "when", "which", "who", "does", "is", "are", "can", "could", "would", "should"}
+
+    # Check if it's primarily a question
+    is_question = prompt_lower.endswith("?")
+
+    # If it starts with a question word and ends with ?, it's likely just a question
+    if starts_with_question and is_question and not has_strong_action:
+        return False
+
+    # If it starts with a question word but has strong action words, might be a request
+    # e.g., "Can you fix this?" or "Could you add a button?"
+    if starts_with_question and has_strong_action:
+        return True
+
+    # If it has strong action words, likely to edit
+    if has_strong_action:
+        return True
+
+    # Check for imperative patterns (commands)
+    imperative_starts = ["let's", "lets", "please", "go ahead", "now"]
+    for pattern in imperative_starts:
+        if prompt_lower.startswith(pattern):
+            return True
+
+    # Check for request patterns with action context
+    request_patterns = ["i want", "i need", "we need", "we should", "i'd like"]
+    for pattern in request_patterns:
+        if pattern in prompt_lower:
+            return True
+
+    # Default: if it's a question, probably not editing
+    if is_question or starts_with_question:
+        return False
+
+    return False
+
 
 
 def is_electron_app_running():
@@ -857,10 +1001,35 @@ class ExerciseTrackerHook:
     def handle_hook(self, event_type, data):
         """Main hook handler"""
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
-            # First, check if Electron menubar app is running
-            if is_electron_app_running():
-                # Get or create session ID (persist across hook calls)
-                session_id_file = Path("/tmp/vibereps-session-id")
+            # For user_prompt_submit, check if the prompt is likely to result in edits
+            if event_type == "user_prompt_submit":
+                # Extract prompt from hook data (could be in 'prompt', 'message', or 'content')
+                prompt = ""
+                if data:
+                    prompt = data.get("prompt") or data.get("message") or data.get("content") or ""
+                    # Also check for nested structure
+                    if not prompt and "input" in data:
+                        prompt = data["input"].get("prompt") or data["input"].get("message") or ""
+
+                if not prompt_likely_to_edit(prompt):
+                    return {"status": "skipped", "message": "Prompt doesn't look like it will result in edits"}
+
+            # First, check if Electron menubar app is running or can be launched
+            electron_running = is_electron_app_running()
+
+            # If Electron app is installed but not running, try to launch it
+            if not electron_running and os.path.exists(ELECTRON_APP_PATH):
+                if launch_electron_app():
+                    electron_running = True
+
+            if electron_running:
+                # Get or create session ID (persist across hook calls, per-terminal and cwd)
+                # Include cwd hash to differentiate multiple Claude instances in same parent
+                cwd_hash = ""
+                if data and data.get("cwd"):
+                    import hashlib
+                    cwd_hash = f"-{hashlib.md5(data['cwd'].encode()).hexdigest()[:8]}"
+                session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
                 if session_id_file.exists():
                     try:
                         session_id = session_id_file.read_text().strip()
