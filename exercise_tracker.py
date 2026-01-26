@@ -129,6 +129,9 @@ VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 
+# Electron app port (fixed port for the menubar app, outside webapp's 8765-8774 range)
+ELECTRON_PORT = 8800
+
 # Exercises that require legs (filtered out when VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1)
 LEG_EXERCISES = {"squats", "calf_raises", "high_knees", "jumping_jacks"}
 
@@ -227,6 +230,7 @@ def prompt_likely_to_edit(prompt: str) -> bool:
         return False
 
     return False
+
 
 
 def is_electron_app_running():

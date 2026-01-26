@@ -1,0 +1,112 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, menubar-app, test]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            electron/package-lock.json
+            tests/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Electron app dependencies
+        run: npm ci
+        working-directory: electron
+
+      - name: Install test dependencies
+        run: npm ci
+        working-directory: tests
+
+      - name: Install Playwright Electron
+        run: npx playwright install
+        working-directory: tests
+
+      - name: Run Playwright tests
+        run: npm test
+        working-directory: tests
+        env:
+          CI: true
+          # Disable actual camera access in CI
+          VIBEREPS_MOCK_CAMERA: "1"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/playwright-report/
+          retention-days: 30
+
+      - name: Upload test videos
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-videos
+          path: tests/test-results/
+          retention-days: 7
+
+  # Quick smoke test for Python hooks
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile exercise_tracker.py
+          python3 -m py_compile notify_complete.py
+
+      - name: Test --help flags
+        run: |
+          python3 exercise_tracker.py --help
+          python3 exercise_tracker.py --list-exercises
+
+  # Verify Electron build works
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: electron
+
+      - name: Build Electron app
+        run: npm run build
+        working-directory: electron
+
+      - name: Verify build output
+        run: |
+          ls -la dist/
+          test -d "dist/mac" || test -d "dist/mac-arm64"
+        working-directory: electron
