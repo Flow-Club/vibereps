@@ -2237,7 +2237,7 @@ const selector = document.getElementById('exerciseSelector');
                 if (activity.file_path) {
                     const contextEl = document.getElementById('claudeContext');
                     if (contextEl) {
-                        contextEl.innerHTML = `<div class="context-header">Claude is editing...</div><div>${activity.file_path.split('/').pop()}</div>`;
+                        contextEl.innerHTML = `<div class="context-header">Claude is editing...</div><div>${escapeHtml(activity.file_path.split('/').pop())}</div>`;
                         contextEl.style.display = 'block';
                     }
                 }
@@ -2248,7 +2248,7 @@ const selector = document.getElementById('exerciseSelector');
                 console.log('Claude complete:', data);
                 const contextEl = document.getElementById('claudeContext');
                 if (contextEl) {
-                    contextEl.innerHTML = `<div class="context-header">Claude finished!</div><div>${data.message || 'Ready for exercise'}</div>`;
+                    contextEl.innerHTML = `<div class="context-header">Claude finished!</div><div>${escapeHtml(data.message || 'Ready for exercise')}</div>`;
                 }
             });
 
