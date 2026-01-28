@@ -1,0 +1,26 @@
+{
+  "name": "vibereps",
+  "version": "1.0.0",
+  "description": "Exercise tracking system for Claude Code that encourages movement breaks during coding sessions",
+  "private": true,
+  "scripts": {
+    "test": "cd tests && npm test",
+    "test:headed": "cd tests && npm run test:headed",
+    "test:debug": "cd tests && npm run test:debug",
+    "test:install": "cd tests && npm install",
+    "build": "cd electron && npm run build",
+    "build:dmg": "cd electron && npm run build:dmg",
+    "start": "cd electron && npm start",
+    "electron:install": "cd electron && npm install",
+    "install:all": "npm run electron:install && npm run test:install",
+    "postinstall": "npm run install:all"
+  },
+  "keywords": [
+    "exercise",
+    "health",
+    "claude-code",
+    "electron",
+    "mediapipe"
+  ],
+  "license": "MIT"
+}
