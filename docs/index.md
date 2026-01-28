@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: VibeReps
-  text: Don't neglect your physical corpus while Opus generates.
-  tagline: Turn model generation time into movement.
+  text: Tend to your quads while you tend to your Claudes.
+  tagline: Do exercises and think a little yourself while you wait for Claude.
   actions:
     - theme: brand
       text: Get Started

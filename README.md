@@ -1,8 +1,8 @@
 # Vibe Reps
 
-Don't neglect your physical corpus while Opus generates.
+Tend to your quads while you tend to your Claudes.
 
-Turn model generation time into movement.
+Do exercises and think a little yourself while you wait for Claude.
 
 > "It's the era of tending to your Claudes."
 > — [Boris Cherny](https://x.com/bcherny), creator of Claude Code, on [Greg Isenberg's podcast](https://x.com/gregisenberg)
