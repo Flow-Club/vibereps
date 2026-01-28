@@ -629,19 +629,23 @@ const selector = document.getElementById('exerciseSelector');
                     selector.appendChild(btn);
                 }
 
-                // Handle auto-start from exercises parameter (defaults to squats)
+                // Auto-start with a random exercise (user can change via dropdown)
                 const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
+                let availableExercises;
                 if (exercisesParam) {
-                    const enabledExercises = exercisesParam.split(',').map(e => e.trim()).filter(e =>
+                    availableExercises = exercisesParam.split(',').map(e => e.trim()).filter(e =>
                         exercises[e]
                     );
-                    if (enabledExercises.length > 0) {
-                        // Default to squats if available, otherwise first enabled exercise
-                        const startExercise = enabledExercises.includes('squats') ? 'squats' : enabledExercises[0];
-                        selector.style.display = 'none';
-                        showExerciseToggle(startExercise);
-                        setTimeout(() => startWithStandUpCheck(startExercise), 500);
-                    }
+                } else {
+                    // Use all loaded exercises
+                    availableExercises = Object.keys(exercises).filter(id => !id.startsWith('_'));
+                }
+
+                if (availableExercises.length > 0) {
+                    const randomExercise = availableExercises[Math.floor(Math.random() * availableExercises.length)];
+                    selector.style.display = 'none';
+                    showExerciseToggle(randomExercise);
+                    setTimeout(() => startWithStandUpCheck(randomExercise), 500);
                 }
 
             } catch (error) {
@@ -673,6 +677,12 @@ const selector = document.getElementById('exerciseSelector');
                 btn.innerHTML = `${ex.name} (<span class="rep-count">${reps}</span>)`;
                 selector.appendChild(btn);
             }
+
+            // Auto-start with random fallback exercise
+            const ids = fallbackExercises.map(e => e.id);
+            const randomExercise = ids[Math.floor(Math.random() * ids.length)];
+            showExerciseToggle(randomExercise);
+            setTimeout(() => startWithStandUpCheck(randomExercise), 500);
         }
 
         // Update subtitle
