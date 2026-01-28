@@ -232,18 +232,20 @@ Exercise after code edits! Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /path/to/exercise_tracker.py post_tool_use '{}'"
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /path/to/exercise_tracker.py post_tool_use '{}'",
+            "async": true
           }
         ]
       }
     ],
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "idle_prompt|permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/notify_complete.py '{}'"
+            "command": "/path/to/notify_complete.py '{}'",
+            "async": true
           }
         ]
       }

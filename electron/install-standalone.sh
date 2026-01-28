@@ -98,7 +98,8 @@ configure_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'"
+            "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'",
+            "async": true
           }
         ]
       }
@@ -109,7 +110,8 @@ configure_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "$REPO_DIR/notify_complete.py '{}'"
+            "command": "$REPO_DIR/notify_complete.py '{}'",
+            "async": true
           }
         ]
       }
@@ -181,14 +183,16 @@ if [ "$HOOKS_CONFIGURED" = false ] && [ "$HAS_JQ" = false ]; then
       "matcher": "Write|Edit",
       "hooks": [{
         "type": "command",
-        "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'"
+        "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'",
+        "async": true
       }]
     }],
     "Notification": [{
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "$REPO_DIR/notify_complete.py '{}'"
+        "command": "$REPO_DIR/notify_complete.py '{}'",
+        "async": true
       }]
     }]
   }

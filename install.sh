@@ -309,7 +309,8 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py post_tool_use '{{}}'"
+                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py post_tool_use '{{}}'",
+                    "async": True
                 }
             ]
         }
@@ -320,7 +321,8 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"{install_dir}/notify_complete.py '{{}}'"
+                    "command": f"{install_dir}/notify_complete.py '{{}}'",
+                    "async": True
                 }
             ]
         }
@@ -335,7 +337,8 @@ if trigger_mode == "prompt":
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py user_prompt_submit '{{}}'"
+                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py user_prompt_submit '{{}}'",
+                    "async": True
                 }
             ]
         }
