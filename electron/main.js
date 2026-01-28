@@ -47,17 +47,15 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
-// Get local ISO timestamp (matches Python's datetime.now().isoformat())
-function getLocalTimestamp() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  const ms = String(now.getMilliseconds()).padStart(3, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+// Convert a timestamp to local YYYY-MM-DD date
+function timestampToLocalDate(timestamp) {
+  // Parse the timestamp and get local date components
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Get today's exercise stats from log file
@@ -72,7 +70,7 @@ function getTodayExerciseStats() {
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
-          const date = entry.timestamp?.split('T')[0];
+          const date = timestampToLocalDate(entry.timestamp);
           if (date === today && entry.reps > 0 && !entry.exercise?.startsWith('_')) {
             const exercise = entry.exercise || 'unknown';
             stats[exercise] = (stats[exercise] || 0) + entry.reps;
@@ -314,7 +312,7 @@ function setupHttpServer() {
     if (exercise && !exercise.startsWith('_') && reps > 0) {
       // Log exercise locally
       const logEntry = {
-        timestamp: getLocalTimestamp(),
+        timestamp: new Date().toISOString(),
         session_id,
         exercise,
         reps,
@@ -362,7 +360,7 @@ function setupHttpServer() {
     const { exercise, reps, duration } = req.body;
     // Filter out internal states and zero-rep entries (same as Python hook)
     if (exercise && !exercise.startsWith('_') && reps > 0) {
-      logExercise({ timestamp: getLocalTimestamp(), exercise, reps, duration });
+      logExercise({ timestamp: new Date().toISOString(), exercise, reps, duration });
       // Refresh menu to show updated stats
       if (tray) {
         tray.setContextMenu(buildContextMenu());

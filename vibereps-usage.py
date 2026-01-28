@@ -13,6 +13,28 @@ from collections import defaultdict
 from pathlib import Path
 
 
+def timestamp_to_local_date(ts: str) -> str:
+    """Convert ISO timestamp to local YYYY-MM-DD date."""
+    from datetime import datetime
+    try:
+        # Handle both UTC (with Z) and local (without Z) timestamps
+        if ts.endswith('Z'):
+            dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        elif '+' in ts or ts.count('-') > 2:
+            # Has timezone info
+            dt = datetime.fromisoformat(ts)
+        else:
+            # No timezone, assume local
+            dt = datetime.fromisoformat(ts)
+            return dt.strftime('%Y-%m-%d')
+        # Convert to local time
+        local_dt = dt.astimezone()
+        return local_dt.strftime('%Y-%m-%d')
+    except (ValueError, AttributeError):
+        # Fallback: just split on T
+        return ts.split("T")[0] if "T" in ts else ts[:10]
+
+
 def load_exercise_data():
     """Load exercise data from local JSONL file."""
     log_file = Path.home() / ".vibereps" / "exercises.jsonl"
@@ -28,7 +50,7 @@ def load_exercise_data():
             try:
                 entry = json.loads(line.strip())
                 ts = entry.get("timestamp", "")
-                date = ts.split("T")[0] if "T" in ts else ts[:10]
+                date = timestamp_to_local_date(ts)
                 exercise = entry.get("exercise", "unknown")
                 reps = entry.get("reps", 0)
                 # Skip internal states and zero-rep entries
