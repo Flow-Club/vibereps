@@ -8,9 +8,11 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
     <script>
-        // Electron detection - check for preload API or URL param
+        // Electron detection - only use local MediaPipe if electronAPI is available (true Electron context)
+        // URL param alone isn't enough since local files may not exist in dev mode
         window.isElectronApp = !!(window.electronAPI?.isElectron || new URLSearchParams(window.location.search).get('electron'));
-        window.mediapipeBasePath = window.isElectronApp ? '/mediapipe/pose' : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+        window.useLocalMediaPipe = !!window.electronAPI?.isElectron;  // Only if preload script ran
+        window.mediapipeBasePath = window.useLocalMediaPipe ? '/mediapipe/pose' : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
 
         // Dynamically load MediaPipe based on environment
         window.mediapipeReady = new Promise((resolve) => {
@@ -28,7 +30,7 @@
             poseScript.onerror = () => { console.error('Failed to load MediaPipe Pose'); resolve(); };
             cameraScript.onerror = () => { console.error('Failed to load Camera Utils'); resolve(); };
 
-            if (window.isElectronApp) {
+            if (window.useLocalMediaPipe) {
                 poseScript.src = '/mediapipe/pose/pose.js';
                 cameraScript.src = '/mediapipe/camera_utils/camera_utils.js';
             } else {
