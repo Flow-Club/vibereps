@@ -11,19 +11,17 @@
         // Electron detection - check for preload API or URL param
         window.isElectronApp = !!(window.electronAPI?.isElectron || new URLSearchParams(window.location.search).get('electron'));
         window.mediapipeBasePath = window.isElectronApp ? '/mediapipe/pose' : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
-    </script>
-    <script id="mediapipe-pose-script"></script>
-    <script id="mediapipe-camera-script"></script>
-    <script>
+
         // Dynamically load MediaPipe based on environment
         window.mediapipeReady = new Promise((resolve) => {
-            const poseScript = document.getElementById('mediapipe-pose-script');
-            const cameraScript = document.getElementById('mediapipe-camera-script');
             let poseLoaded = false, cameraLoaded = false;
 
             function checkReady() {
                 if (poseLoaded && cameraLoaded) resolve();
             }
+
+            const poseScript = document.createElement('script');
+            const cameraScript = document.createElement('script');
 
             poseScript.onload = () => { poseLoaded = true; checkReady(); };
             cameraScript.onload = () => { cameraLoaded = true; checkReady(); };
@@ -39,6 +37,9 @@
                 cameraScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js';
                 cameraScript.crossOrigin = 'anonymous';
             }
+
+            document.head.appendChild(poseScript);
+            document.head.appendChild(cameraScript);
         });
     </script>
     <style>
