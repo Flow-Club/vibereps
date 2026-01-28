@@ -479,8 +479,8 @@ function createWindow() {
   });
 
   // Load from HTTP server so MediaPipe paths work correctly
-  // Load with quick=true to auto-select random exercise
-  mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true&quick=true`);
+  // Load with electron=true for Electron-specific features
+  mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true`);
 
   mainWindow.on('close', (event) => {
     // Hide instead of close (unless app is quitting)

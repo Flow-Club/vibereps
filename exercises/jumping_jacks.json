@@ -5,8 +5,8 @@
   "category": "cardio",
 
   "reps": {
-    "normal": 20,
-    "quick": 10
+    "normal": 15,
+    "quick": 15
   },
 
   "detection": {

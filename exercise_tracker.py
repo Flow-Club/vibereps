@@ -943,7 +943,7 @@ class ExerciseTrackerHook:
 
         url = f"http://localhost:{self.port}"
         if quick_mode:
-            url += "?quick=true"
+            # quick mode removed - always use normal reps
         return url
 
     def wait_for_completion(self, timeout=600):
@@ -1140,10 +1140,10 @@ class ExerciseTrackerHook:
                 port = int(PORT_FILE.read_text().strip()) if PORT_FILE.exists() else PORT_RANGE.start
             except (ValueError, OSError):
                 port = PORT_RANGE.start
-            url = f"http://localhost:{port}?quick=true"
+            url = f"http://localhost:{port}"
             exercises = get_filtered_exercises()
             if exercises:
-                url += f"&exercises={exercises}"
+                url += f"?exercises={exercises}"
             open_small_window(url)
 
             # Don't delete lock - let it stay for 10s stale window

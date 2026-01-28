@@ -588,7 +588,7 @@
         let frameLoopId = null;  // For manual frame loop when camera switching
         let startTime = null;
         let statusPollInterval = null;
-        let isQuickMode = new URLSearchParams(window.location.search).get('quick') === 'true';
+        let isQuickMode = false;  // Simplified: always use normal reps
         let selectedCameraId = localStorage.getItem('vibereps-camera') || '';
         let completedExercises = new Set();  // Track exercises done this session
         let totalRepsThisSession = 0;        // Total reps across all exercises
@@ -629,17 +629,18 @@ const selector = document.getElementById('exerciseSelector');
                     selector.appendChild(btn);
                 }
 
-                // Handle auto-start from exercises parameter
+                // Handle auto-start from exercises parameter (defaults to squats)
                 const exercisesParam = new URLSearchParams(window.location.search).get('exercises');
                 if (exercisesParam) {
                     const enabledExercises = exercisesParam.split(',').map(e => e.trim()).filter(e =>
                         exercises[e]
                     );
                     if (enabledExercises.length > 0) {
-                        const randomExercise = enabledExercises[Math.floor(Math.random() * enabledExercises.length)];
+                        // Default to squats if available, otherwise first enabled exercise
+                        const startExercise = enabledExercises.includes('squats') ? 'squats' : enabledExercises[0];
                         selector.style.display = 'none';
-                        showExerciseToggle(randomExercise);
-                        setTimeout(() => startWithStandUpCheck(randomExercise), 500);
+                        showExerciseToggle(startExercise);
+                        setTimeout(() => startWithStandUpCheck(startExercise), 500);
                     }
                 }
 
@@ -655,9 +656,9 @@ const selector = document.getElementById('exerciseSelector');
         function loadFallbackExercises() {
             // Fallback hardcoded exercises if server fails
             const fallbackExercises = [
-                {id: 'squats', name: 'Squats', reps: {normal: 10, quick: 5}},
-                {id: 'jumping_jacks', name: 'Jumping Jacks', reps: {normal: 20, quick: 10}},
-                {id: 'high_knees', name: 'High Knees', reps: {normal: 20, quick: 10}}
+                {id: 'squats', name: 'Squats', reps: {normal: 10, quick: 10}},
+                {id: 'jumping_jacks', name: 'Jumping Jacks', reps: {normal: 15, quick: 15}},
+                {id: 'high_knees', name: 'High Knees', reps: {normal: 20, quick: 20}}
             ];
 
             const selector = document.getElementById('exerciseSelector');
@@ -674,11 +675,8 @@ const selector = document.getElementById('exerciseSelector');
             }
         }
 
-        // Update title for quick mode
-        if (isQuickMode) {
-            document.getElementById('title').textContent = 'vibereps --quick';
-            document.getElementById('subtitle').textContent = 'quick session while claude works';
-        }
+        // Update subtitle
+        document.getElementById('subtitle').textContent = 'Tend to your quads while you tend to your Claudes';
 
         // ============================================
         // Stand-up detection
