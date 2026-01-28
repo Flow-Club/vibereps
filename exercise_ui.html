@@ -8,11 +8,11 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
     <script>
-        // Electron detection - only use local MediaPipe if electronAPI is available (true Electron context)
-        // URL param alone isn't enough since local files may not exist in dev mode
+        // Electron detection
         window.isElectronApp = !!(window.electronAPI?.isElectron || new URLSearchParams(window.location.search).get('electron'));
-        window.useLocalMediaPipe = !!window.electronAPI?.isElectron;  // Only if preload script ran
-        window.mediapipeBasePath = window.useLocalMediaPipe ? '/mediapipe/pose' : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+        // Always use CDN for MediaPipe (local bundling not set up yet)
+        window.useLocalMediaPipe = false;
+        window.mediapipeBasePath = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
 
         // Dynamically load MediaPipe based on environment
         window.mediapipeReady = new Promise((resolve) => {
@@ -30,15 +30,11 @@
             poseScript.onerror = () => { console.error('Failed to load MediaPipe Pose'); resolve(); };
             cameraScript.onerror = () => { console.error('Failed to load Camera Utils'); resolve(); };
 
-            if (window.useLocalMediaPipe) {
-                poseScript.src = '/mediapipe/pose/pose.js';
-                cameraScript.src = '/mediapipe/camera_utils/camera_utils.js';
-            } else {
-                poseScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js';
-                poseScript.crossOrigin = 'anonymous';
-                cameraScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js';
-                cameraScript.crossOrigin = 'anonymous';
-            }
+            // Always load from CDN (local bundling not set up)
+            poseScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js';
+            poseScript.crossOrigin = 'anonymous';
+            cameraScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js';
+            cameraScript.crossOrigin = 'anonymous';
 
             document.head.appendChild(poseScript);
             document.head.appendChild(cameraScript);
