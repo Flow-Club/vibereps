@@ -3,11 +3,22 @@
 ## Overview
 
 ```
-Local                                   Remote Server
-─────                                   ─────────────
-exercise_tracker.py ──POST /api/log──▶  FastAPI (server/main.py)
-exercise_ui.html                        ├── REST API (for hook)
-                                        └── MCP HTTP (for Claude)
+Local (Two UI Options)                    Remote Server
+─────────────────────                     ─────────────
+
+Option A: Electron Menubar App
+┌─────────────────────────────┐
+│ VibeReps.app (port 8800)    │──POST /api/log──▶  FastAPI
+│ ├── session-manager.js      │                    (server/main.py)
+│ └── exercise_ui.html        │
+└─────────────────────────────┘
+
+Option B: Web Browser
+┌─────────────────────────────┐
+│ exercise_tracker.py         │──POST /api/log──▶  FastAPI
+│ (ports 8765-8774)           │
+│ └── exercise_ui.html        │
+└─────────────────────────────┘
 
 Claude Code ────────MCP over HTTP────▶  /mcp endpoint
                                         ├── get_stats
@@ -17,6 +28,16 @@ Claude Code ────────MCP over HTTP────▶  /mcp endpoint
 ```
 
 ## Local Components
+
+### Electron Menubar App (`electron/`)
+
+Native macOS app with:
+- `main.js`: Main process, Express server on port 8800, tray management
+- `session-manager.js`: Tracks multiple Claude instances (10-min timeout)
+- `preload.js`: Secure IPC bridge to renderer
+- `assets/mediapipe/`: Bundled pose detection models (~44MB)
+
+Session states: `active` → `waiting_exercise` → `exercising` → `complete`
 
 ### Exercise Tracker (`exercise_tracker.py`)
 

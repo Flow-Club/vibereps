@@ -15,18 +15,20 @@ The installer adds these hooks to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches ~/.vibereps/exercise_tracker.py post_tool_use '{}'"
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches ~/.vibereps/exercise_tracker.py post_tool_use '{}'",
+            "async": true
           }
         ]
       }
     ],
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "idle_prompt|permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/notify_complete.py '{}'"
+            "command": "~/.vibereps/notify_complete.py '{}'",
+            "async": true
           }
         ]
       }
@@ -34,6 +36,18 @@ The installer adds these hooks to `~/.claude/settings.json`:
   }
 }
 ```
+
+## Async Execution
+
+Hooks run asynchronously with `"async": true`, meaning they don't block Claude's execution. This is ideal for the exercise tracker since it runs independently while Claude continues working.
+
+## Smart Prompt Detection
+
+In `user_prompt_submit` mode, the tracker analyzes prompts to skip those unlikely to result in code edits:
+
+**Triggers on action words:** fix, add, implement, create, update, change, modify, refactor, etc.
+
+**Skips question words:** what, why, how, explain, describe, show, etc.
 
 ## Hook Types
 
@@ -83,11 +97,12 @@ Triggers when Claude sends a notification (task complete, waiting for input):
   "hooks": {
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "idle_prompt|permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/notify_complete.py '{}'"
+            "command": "~/.vibereps/notify_complete.py '{}'",
+            "async": true
           }
         ]
       }
@@ -96,7 +111,7 @@ Triggers when Claude sends a notification (task complete, waiting for input):
 }
 ```
 
-This signals the exercise UI that Claude is ready, showing a desktop notification.
+This signals the exercise UI that Claude is ready, showing a desktop notification. The matcher `idle_prompt|permission_prompt` ensures notifications trigger when Claude finishes or needs input.
 
 ## Verify Hooks
 

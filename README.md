@@ -122,18 +122,20 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /path/to/exercise_tracker.py post_tool_use '{}'"
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /path/to/exercise_tracker.py post_tool_use '{}'",
+            "async": true
           }
         ]
       }
     ],
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "idle_prompt|permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/notify_complete.py '{}'"
+            "command": "/path/to/notify_complete.py '{}'",
+            "async": true
           }
         ]
       }
@@ -189,6 +191,15 @@ export VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1
 # Remote VibeReps server (optional)
 export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key
+
+# Disable tracking entirely
+export VIBEREPS_DISABLED=1
+
+# UI mode (for non-interactive install)
+export VIBEREPS_UI_MODE=electron  # or webapp
+
+# Trigger mode
+export VIBEREPS_TRIGGER_MODE=edit-only  # or prompt
 ```
 
 If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from the list and auto-start it (no manual selection needed).

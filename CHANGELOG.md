@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-28
+
+### Added
+- Electron menubar app for macOS with multi-instance session tracking
+- Async hook execution (`"async": true`) for non-blocking operation
+- `VIBEREPS_DISABLED` environment variable to disable tracking
+- `VIBEREPS_UI_MODE` environment variable (electron/webapp)
+- `VIBEREPS_TRIGGER_MODE` environment variable (edit-only/prompt)
+- Smart prompt detection for `user_prompt_submit` mode
+- Session manager for tracking multiple Claude instances
+- Bundled MediaPipe for offline use in Electron app
+- DMG distribution support
+
+### Fixed
+- XSS vulnerability in exercise_ui.html (escaped HTML in dynamic content)
+
+### Changed
+- Two-tier port architecture: Electron uses 8800, webapp uses 8765-8774
+- Notification hook matcher changed to `idle_prompt|permission_prompt`
+
+## [0.1.1] - 2026-01-15
+
 ### Added
 - `--dangerously-skip-leg-day` feature via `VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1`
 - `vibereps-usage.py` for combined Claude Code + exercise stats

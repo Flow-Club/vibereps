@@ -82,14 +82,16 @@ Read existing `~/.claude/settings.json` and update the PostToolUse hook with sel
       "matcher": "Write|Edit|MultiEdit",
       "hooks": [{
         "type": "command",
-        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py post_tool_use '{}'"
+        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py post_tool_use '{}'",
+        "async": true
       }]
     }],
     "Notification": [{
-      "matcher": "",
+      "matcher": "idle_prompt|permission_prompt",
       "hooks": [{
         "type": "command",
-        "command": "{vibereps_dir}/notify_complete.py '{}'"
+        "command": "{vibereps_dir}/notify_complete.py '{}'",
+        "async": true
       }]
     }]
   }
@@ -126,5 +128,6 @@ To change exercises later, run /setup-vibereps again.
 ## Important Notes
 
 - Always use absolute paths in hooks (not ~, use full $HOME path)
-- The Notification hook should have an empty matcher "" to catch all notifications
+- The Notification hook uses matcher `idle_prompt|permission_prompt` to catch task completions
+- Hooks run asynchronously with `"async": true` so they don't block Claude
 - Preserve existing hooks and settings when updating settings.json

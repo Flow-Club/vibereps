@@ -35,6 +35,25 @@ export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key
 ```
 
+### Disable Tracking
+
+```bash
+# Temporarily disable VibeReps
+export VIBEREPS_DISABLED=1
+```
+
+### Installation Preferences
+
+Set during install or change later:
+
+```bash
+# UI mode: electron (menubar) or webapp (browser)
+export VIBEREPS_UI_MODE=electron
+
+# Trigger mode: edit-only or prompt (experimental)
+export VIBEREPS_TRIGGER_MODE=edit-only
+```
+
 ### Usage Tracking
 
 Exercise data is automatically logged to `~/.vibereps/exercises.jsonl`. View combined Claude Code + exercise stats with:
@@ -59,12 +78,17 @@ Edit the JSON config files in `~/.vibereps/exercises/` to change target reps:
 
 Each exercise has its own JSON file with rep targets. See `exercises/` directory for all available configs.
 
-## Change Server Port
+## Server Ports
 
-The exercise tracker runs a local server on port 8765. To change it, edit `~/.vibereps/exercise_tracker.py`:
+VibeReps uses a two-tier port architecture:
+
+- **Electron app**: Fixed port 8800
+- **Webapp (browser)**: Ports 8765-8774 (dynamic allocation)
+
+The webapp automatically finds an available port in the range. To change the base port for the webapp, edit `~/.vibereps/exercise_tracker.py`:
 
 ```python
-self.port = 8765  # Change to your preferred port
+self.port = 8765  # Base port (will try 8765-8774)
 ```
 
 ## Next Steps

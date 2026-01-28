@@ -52,6 +52,20 @@ Claude Code ────────MCP over HTTP────▶  /mcp endpoint
 - Exercise tracker UI polls `/status` endpoint to detect when Claude is ready
 - Shows desktop notification and updates UI when complete
 
+### Electron Menubar App (`electron/`)
+
+Native macOS app providing:
+- Always-on menubar presence with stats
+- Multi-instance Claude session tracking via SessionManager
+- Native notifications
+- Bundled MediaPipe for offline use
+- Express HTTP API on port 8800
+
+Key files:
+- `main.js`: Main process, Express server, tray management
+- `session-manager.js`: Tracks Claude instances (10-min timeout)
+- `preload.js`: Secure IPC bridge
+
 ### Remote Server (`server/main.py`)
 
 - **REST API** (`/api/*`) - For local hook to POST exercise sessions
@@ -217,6 +231,15 @@ Set these to enable remote logging:
 ```bash
 export VIBEREPS_API_URL=https://your-server.com
 export VIBEREPS_API_KEY=your_api_key_here
+
+# Disable tracking entirely
+export VIBEREPS_DISABLED=1
+
+# UI mode: electron (menubar) or webapp (browser)
+export VIBEREPS_UI_MODE=electron
+
+# Trigger mode: edit-only or prompt
+export VIBEREPS_TRIGGER_MODE=edit-only
 ```
 
 ### 2. Hook Setup
