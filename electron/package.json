@@ -9,7 +9,7 @@
     "build": "electron-builder --mac dir",
     "build:dmg": "electron-builder --mac dmg",
     "build:all": "electron-builder --mac dmg zip",
-    "install": "./install.sh",
+    "setup:dev": "./install.sh",
     "setup": "./install-standalone.sh",
     "download-mediapipe": "node scripts/download-mediapipe.js"
   },
