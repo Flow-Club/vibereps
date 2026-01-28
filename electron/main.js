@@ -292,27 +292,32 @@ function setupHttpServer() {
   expressApp.post('/api/complete', (req, res) => {
     const { session_id, exercise, reps, duration } = req.body;
 
-    // Log exercise locally
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      session_id,
-      exercise,
-      reps,
-      duration
-    };
-    logExercise(logEntry);
+    // Filter out internal states and zero-rep entries (same as Python hook)
+    let logged = false;
+    if (exercise && !exercise.startsWith('_') && reps > 0) {
+      // Log exercise locally
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        session_id,
+        exercise,
+        reps,
+        duration
+      };
+      logExercise(logEntry);
+      logged = true;
 
-    // Notify renderer
-    if (mainWindow) {
-      mainWindow.webContents.send('exercise-complete', logEntry);
+      // Notify renderer
+      if (mainWindow) {
+        mainWindow.webContents.send('exercise-complete', logEntry);
+      }
+
+      // Refresh menu to show updated stats
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
     }
 
-    // Refresh menu to show updated stats
-    if (tray) {
-      tray.setContextMenu(buildContextMenu());
-    }
-
-    res.json({ success: true, logged: true });
+    res.json({ success: true, logged });
   });
 
   // API: Get status (backward compatibility)
@@ -338,10 +343,13 @@ function setupHttpServer() {
 
   expressApp.post('/complete', (req, res) => {
     const { exercise, reps, duration } = req.body;
-    logExercise({ timestamp: new Date().toISOString(), exercise, reps, duration });
-    // Refresh menu to show updated stats
-    if (tray) {
-      tray.setContextMenu(buildContextMenu());
+    // Filter out internal states and zero-rep entries (same as Python hook)
+    if (exercise && !exercise.startsWith('_') && reps > 0) {
+      logExercise({ timestamp: new Date().toISOString(), exercise, reps, duration });
+      // Refresh menu to show updated stats
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
     }
     res.json({ success: true });
   });
@@ -583,7 +591,10 @@ function setupIPC() {
   });
 
   ipcMain.on('exercise-complete', (event, data) => {
-    logExercise(data);
+    // Filter out internal states and zero-rep entries (same as Python hook)
+    if (data.exercise && !data.exercise.startsWith('_') && data.reps > 0) {
+      logExercise(data);
+    }
   });
 }
 

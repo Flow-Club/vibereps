@@ -1833,7 +1833,16 @@ const selector = document.getElementById('exerciseSelector');
         // ============================================
         // Session management
         // ============================================
+        let sessionFinished = false;  // Guard against double submission
+
         function finishSession() {
+            if (sessionFinished) return;  // Prevent double-click
+            sessionFinished = true;
+
+            // Disable button immediately
+            const finishBtn = document.querySelector('.finish-btn');
+            if (finishBtn) finishBtn.disabled = true;
+
             const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
 
             fetch('/complete', {
@@ -1851,6 +1860,8 @@ const selector = document.getElementById('exerciseSelector');
             }).catch(err => {
                 console.error('Error logging session:', err);
                 document.getElementById('status').textContent = 'Session complete! You can close this window.';
+                sessionFinished = false;  // Allow retry on error
+                if (finishBtn) finishBtn.disabled = false;
             });
         }
 
@@ -2173,7 +2184,19 @@ const selector = document.getElementById('exerciseSelector');
         // Clean shutdown on window close
         // ============================================
         function notifyShutdown() {
-            // Use sendBeacon for reliable delivery during page unload
+            // Auto-log exercise if any reps were done (don't lose progress on close)
+            if (!sessionFinished && repCount > 0 && currentExercise && !currentExercise.startsWith('_')) {
+                const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+                const data = JSON.stringify({
+                    completed: true,
+                    reps: repCount,
+                    exercise: currentExercise,
+                    duration: duration
+                });
+                // Use sendBeacon for reliable delivery during page unload
+                navigator.sendBeacon('/complete', new Blob([data], { type: 'application/json' }));
+                sessionFinished = true;  // Prevent double-logging
+            }
             navigator.sendBeacon('/shutdown', '');
         }
 
