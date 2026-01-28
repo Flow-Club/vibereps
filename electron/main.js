@@ -38,9 +38,26 @@ const mediapipePath = isDev
   : path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'mediapipe');
 const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
 
-// Get today's date in YYYY-MM-DD format
+// Get today's date in YYYY-MM-DD format (local timezone)
 function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Get local ISO timestamp (matches Python's datetime.now().isoformat())
+function getLocalTimestamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 }
 
 // Get today's exercise stats from log file
@@ -297,7 +314,7 @@ function setupHttpServer() {
     if (exercise && !exercise.startsWith('_') && reps > 0) {
       // Log exercise locally
       const logEntry = {
-        timestamp: new Date().toISOString(),
+        timestamp: getLocalTimestamp(),
         session_id,
         exercise,
         reps,
@@ -345,7 +362,7 @@ function setupHttpServer() {
     const { exercise, reps, duration } = req.body;
     // Filter out internal states and zero-rep entries (same as Python hook)
     if (exercise && !exercise.startsWith('_') && reps > 0) {
-      logExercise({ timestamp: new Date().toISOString(), exercise, reps, duration });
+      logExercise({ timestamp: getLocalTimestamp(), exercise, reps, duration });
       // Refresh menu to show updated stats
       if (tray) {
         tray.setContextMenu(buildContextMenu());
