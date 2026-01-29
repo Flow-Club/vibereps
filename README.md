@@ -198,8 +198,9 @@ export VIBEREPS_DISABLED=1
 # UI mode (for non-interactive install)
 export VIBEREPS_UI_MODE=electron  # or webapp
 
-# Trigger mode
-export VIBEREPS_TRIGGER_MODE=edit-only  # or prompt
+# Trigger mode (when exercises start)
+export VIBEREPS_TRIGGER_MODE=edit-only  # (recommended) trigger when Claude edits files
+export VIBEREPS_TRIGGER_MODE=prompt     # (experimental) also trigger on prompt submit
 ```
 
 If `VIBEREPS_EXERCISES` is set, the tracker will randomly pick one exercise from the list and auto-start it (no manual selection needed).

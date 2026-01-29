@@ -2,7 +2,22 @@
 
 VibeReps uses [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) to trigger exercises at the right moments.
 
-## Default Setup
+## Trigger Modes
+
+VibeReps supports two trigger modes:
+
+| Mode | Description | Best for |
+|------|-------------|----------|
+| **edit-only** (recommended) | Exercises trigger when Claude edits files | Reliable, predictable behavior |
+| **prompt** (experimental) | Also triggers on prompt submit, using AI to guess if edits are likely | More exercise opportunities, but may have false positives |
+
+Set via environment variable:
+```bash
+export VIBEREPS_TRIGGER_MODE=edit-only  # recommended
+export VIBEREPS_TRIGGER_MODE=prompt     # experimental
+```
+
+## Default Setup (edit-only)
 
 The installer adds these hooks to `~/.claude/settings.json`:
 
@@ -41,14 +56,6 @@ The installer adds these hooks to `~/.claude/settings.json`:
 
 Hooks run asynchronously with `"async": true`, meaning they don't block Claude's execution. This is ideal for the exercise tracker since it runs independently while Claude continues working.
 
-## Smart Prompt Detection
-
-In `user_prompt_submit` mode, the tracker analyzes prompts to skip those unlikely to result in code edits:
-
-**Triggers on action words:** fix, add, implement, create, update, change, modify, refactor, etc.
-
-**Skips question words:** what, why, how, explain, describe, show, etc.
-
 ## Hook Types
 
 ### PostToolUse (Recommended)
@@ -63,10 +70,15 @@ Triggers after Claude uses a tool. The `matcher` filters which tools trigger the
 - Exercises happen while Claude is still working
 - You stay active during code reviews
 - Doesn't interrupt research/reading tasks
+- Reliable - only triggers when edits actually happen
 
-### UserPromptSubmit (Alternative)
+### UserPromptSubmit (Experimental) :test_tube:
 
-Triggers when you submit a prompt:
+::: warning Experimental
+This mode uses heuristics to guess whether your prompt will result in code edits. It may trigger exercises for prompts that don't actually lead to edits, or miss prompts that do. We recommend starting with edit-only mode.
+:::
+
+Triggers when you submit a prompt, but uses smart detection to filter out questions and research tasks:
 
 ```json
 {
@@ -77,7 +89,8 @@ Triggers when you submit a prompt:
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/exercise_tracker.py user_prompt_submit '{}'"
+            "command": "~/.vibereps/exercise_tracker.py user_prompt_submit '{}'",
+            "async": true
           }
         ]
       }
@@ -86,7 +99,29 @@ Triggers when you submit a prompt:
 }
 ```
 
-**Note:** This triggers on every prompt, including simple questions. May interrupt research tasks.
+#### Smart Prompt Detection
+
+The tracker analyzes your prompt to guess if it will result in code edits:
+
+**Triggers on action words:** fix, add, implement, create, update, change, modify, refactor, build, develop, integrate, migrate, improve, optimize
+
+**Skips question patterns:**
+- Prompts starting with: what, why, how, where, when, which, who, does, is, are, can, could, would, should
+- Prompts ending with `?` (unless they contain strong action words like "Can you fix...")
+
+**Examples:**
+| Prompt | Triggers? | Reason |
+|--------|-----------|--------|
+| "Fix the login bug" | ✅ Yes | Contains "fix" |
+| "Add a logout button" | ✅ Yes | Contains "add" |
+| "Can you refactor this?" | ✅ Yes | Contains "refactor" |
+| "What does this function do?" | ❌ No | Question without action word |
+| "How does the auth system work?" | ❌ No | Question without action word |
+| "Explain the codebase" | ❌ No | Research task |
+
+#### Combining Both Modes
+
+When you choose "prompt" mode during install, VibeReps adds **both** hooks - so exercises trigger on file edits (reliable) AND on prompts that look like they'll result in edits (experimental bonus).
 
 ### Notification
 
@@ -129,5 +164,13 @@ Run `/hooks list` in Claude Code to see registered hooks.
 **Too many exercises?**
 
 Change the matcher to be more specific:
+
 - `Write` - Only new files
 - `Edit` - Only edits to existing files
+
+**Exercises triggering for questions? (prompt mode)**
+
+If you're using experimental prompt mode and getting too many false positives:
+
+1. Switch to edit-only mode: remove the `UserPromptSubmit` hook from settings.json
+2. Or reinstall with: `VIBEREPS_TRIGGER_MODE=edit-only ~/.vibereps/install.sh`
