@@ -50,10 +50,11 @@ function loadWindowBounds() {
         const displays = screen.getAllDisplays();
         const isOnScreen = displays.some(display => {
           const { x, y, width, height } = display.bounds;
-          // Check if window center is within this display
-          const centerX = bounds.x + bounds.width / 2;
-          const centerY = bounds.y + bounds.height / 2;
-          return centerX >= x && centerX < x + width && centerY >= y && centerY < y + height;
+          // Check if at least 100px of the window is visible on this display
+          const minVisible = 100;
+          const visibleX = Math.max(0, Math.min(bounds.x + bounds.width, x + width) - Math.max(bounds.x, x));
+          const visibleY = Math.max(0, Math.min(bounds.y + bounds.height, y + height) - Math.max(bounds.y, y));
+          return visibleX >= minVisible && visibleY >= minVisible;
         });
         if (isOnScreen) {
           return bounds;
