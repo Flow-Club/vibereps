@@ -579,7 +579,7 @@ done
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║${NC}                    ${BLUE}VibeReps Installer${NC}                      ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  Tend to your quads while you tend to your Claudes.!                      ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  Tend to your quads while you tend to your Claudes!                      ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}       Don't neglect your physical corpus!                  ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
