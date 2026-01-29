@@ -3,21 +3,27 @@
 ## Overview
 
 ```
-Local (Two UI Options)                    Remote Server
-─────────────────────                     ─────────────
+Local (Two UI Options)                         Remote Server (optional)
+─────────────────────                          ─────────────────────────
 
 Option A: Electron Menubar App
 ┌─────────────────────────────┐
-│ VibeReps.app (port 8800)    │──POST /api/log──▶  FastAPI
-│ ├── session-manager.js      │                    (server/main.py)
-│ └── exercise_ui.html        │
-└─────────────────────────────┘
+│ VibeReps.app (port 8800)    │──┬── ~/.vibereps/exercises.jsonl
+│ ├── session-manager.js      │  │
+│ └── exercise_ui.html        │  └── POST /api/log ──▶ FastAPI
+└─────────────────────────────┘                        (server/main.py)
 
 Option B: Web Browser
 ┌─────────────────────────────┐
-│ exercise_tracker.py         │──POST /api/log──▶  FastAPI
-│ (ports 8765-8774)           │
-│ └── exercise_ui.html        │
+│ exercise_tracker.py         │──┬── ~/.vibereps/exercises.jsonl
+│ (ports 8765-8774)           │  │
+│ └── exercise_ui.html        │  └── POST /api/log ──▶ FastAPI
+└─────────────────────────────┘
+
+Usage Statistics
+┌─────────────────────────────┐
+│ vibereps-usage.py           │◀── ~/.vibereps/exercises.jsonl
+│                             │◀── ccusage (Claude Code usage)
 └─────────────────────────────┘
 
 Claude Code ────────MCP over HTTP────▶  /mcp endpoint
@@ -42,15 +48,16 @@ Session states: `active` → `waiting_exercise` → `exercising` → `complete`
 ### Exercise Tracker (`exercise_tracker.py`)
 
 A Python script that:
-1. Launches a local HTTP server on port 8765
+1. Launches a local HTTP server on ports 8765-8774
 2. Serves `exercise_ui.html`
 3. Handles exercise completion callbacks
-4. Posts results to remote server (if configured)
+4. Logs results to `~/.vibereps/exercises.jsonl` (always)
+5. Posts results to remote server (if configured)
 
-**Key methods**:
-- `serve()` - Starts the HTTP server
-- `handle_complete()` - Processes exercise completion
-- `post_to_server()` - Sends data to remote API
+**Key functions**:
+- `start_web_server()` - Starts the HTTP server
+- `log_to_local()` - Saves exercise data to local JSONL file
+- `log_to_remote()` - Sends data to remote API (optional)
 
 ### Exercise UI (`exercise_ui.html`)
 

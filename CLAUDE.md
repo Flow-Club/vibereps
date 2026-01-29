@@ -22,17 +22,22 @@ All pose detection uses MediaPipe via browser webcam to count reps (squats, push
 ## Architecture
 
 ```
-Local                                   Remote Server
-─────                                   ─────────────
-exercise_tracker.py ──POST /api/log──▶  FastAPI (server/main.py)
-exercise_ui.html                        ├── REST API (for hook)
-                                        └── MCP HTTP (for Claude)
+Local                                              Remote Server (optional)
+─────                                              ─────────────────────────
+exercise_tracker.py ──┬── ~/.vibereps/exercises.jsonl (local log)
+exercise_ui.html      │
+                      └── POST /api/log ──────────▶ FastAPI (server/main.py)
+                                                    ├── REST API (for hook)
+                                                    └── MCP HTTP (for Claude)
 
-Claude Code ────────MCP over HTTP────▶  /mcp endpoint
-                                        ├── get_stats
-                                        ├── get_leaderboard
-                                        ├── check_streak
-                                        └── log_exercise_session
+vibereps-usage.py ◀── ~/.vibereps/exercises.jsonl
+                  ◀── ccusage (Claude Code usage)
+
+Claude Code ────────MCP over HTTP─────────────────▶ /mcp endpoint
+                                                    ├── get_stats
+                                                    ├── get_leaderboard
+                                                    ├── check_streak
+                                                    └── log_exercise_session
 ```
 
 ### Local Hook (`exercise_tracker.py` + `exercise_ui.html`)
