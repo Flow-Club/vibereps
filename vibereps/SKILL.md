@@ -12,7 +12,7 @@ Movement breaks while you code. When Claude edits files, vibereps launches a pos
 Run the installer to set up hooks and choose exercises:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/flowclub/vibereps/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 ```
 
 This installs the menubar app by default. For browser-only: `bash -s -- --webapp`
@@ -79,5 +79,5 @@ If you prefer manual configuration, add to `~/.claude/settings.json`:
 
 ## Links
 
-- [GitHub](https://github.com/flowclub/vibereps)
-- [Documentation](https://github.com/flowclub/vibereps/tree/main/docs)
+- [GitHub](https://github.com/Flow-Club/vibereps)
+- [Documentation](https://github.com/Flow-Club/vibereps/tree/main/docs)
