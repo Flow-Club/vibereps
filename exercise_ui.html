@@ -1924,17 +1924,24 @@ const selector = document.getElementById('exerciseSelector');
             if (finishBtn) finishBtn.disabled = true;
 
             const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+            const logData = {
+                completed: true,
+                reps: repCount,
+                exercise: currentExercise,
+                duration: duration,
+                timestamp: new Date().toISOString()
+            };
 
-            fetch('/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    completed: true,
-                    reps: repCount,
-                    exercise: currentExercise,
-                    duration: duration
-                })
-            }).then(() => {
+            // Use Electron IPC if available, otherwise HTTP
+            const logPromise = window.electronAPI?.exerciseComplete
+                ? Promise.resolve(window.electronAPI.exerciseComplete(logData))
+                : fetch('/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logData)
+                });
+
+            logPromise.then(() => {
                 document.getElementById('status').textContent = '✅ Session logged! You can close this window.';
                 setTimeout(() => window.close(), 2000);
             }).catch(err => {
@@ -2267,14 +2274,20 @@ const selector = document.getElementById('exerciseSelector');
             // Auto-log exercise if any reps were done (don't lose progress on close)
             if (!sessionFinished && repCount > 0 && currentExercise && !currentExercise.startsWith('_')) {
                 const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-                const data = JSON.stringify({
+                const logData = {
                     completed: true,
                     reps: repCount,
                     exercise: currentExercise,
-                    duration: duration
-                });
-                // Use sendBeacon for reliable delivery during page unload
-                navigator.sendBeacon('/complete', new Blob([data], { type: 'application/json' }));
+                    duration: duration,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Use Electron IPC if available (synchronous), otherwise sendBeacon
+                if (window.electronAPI?.exerciseComplete) {
+                    window.electronAPI.exerciseComplete(logData);
+                } else {
+                    navigator.sendBeacon('/complete', new Blob([JSON.stringify(logData)], { type: 'application/json' }));
+                }
                 sessionFinished = true;  // Prevent double-logging
             }
             navigator.sendBeacon('/shutdown', '');
