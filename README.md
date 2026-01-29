@@ -292,7 +292,9 @@ VibeReps includes built-in skills you can run in Claude Code:
 
 ## 📊 Usage Statistics
 
-Track your Claude Code usage alongside exercise data with `vibereps-usage.py`:
+Track your Claude Code usage alongside exercise data with `vibereps-usage.py`.
+
+Built on top of [**ccusage**](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi) - a fantastic tool for tracking Claude Code token usage and costs. Our usage script was inspired by ccusage's clean table format and adds exercise tracking alongside your coding stats.
 
 ```bash
 ./vibereps-usage.py
@@ -302,7 +304,7 @@ Track your Claude Code usage alongside exercise data with `vibereps-usage.py`:
   <img src="assets/vibereps-usage.gif" alt="vibereps-usage demo" width="800">
 </p>
 
-This combines [ccusage](https://github.com/ryoppippi/ccusage) output with your exercise log into a single table:
+Combines ccusage output with your exercise log into a single table:
 
 ```
 ┌────────────┬───────────────────────────────────────┬───────────┬───────────┬───────────────┬──────────────┬───────────────┬─────────────┬───────────────────────────┐

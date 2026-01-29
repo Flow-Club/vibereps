@@ -6,6 +6,17 @@ View your Claude Code usage alongside exercise data with `vibereps-usage`.
   <img src="/vibereps-usage.gif" alt="vibereps-usage demo" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
 </p>
 
+## Powered by ccusage
+
+This feature is built on [**ccusage**](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi) - an excellent CLI tool for tracking Claude Code token usage and costs. We were inspired by ccusage's clean table format and built `vibereps-usage.py` to add exercise data alongside your coding stats.
+
+If you just want Claude Code usage tracking without exercise data, ccusage is all you need:
+
+```bash
+npm install -g ccusage
+ccusage daily
+```
+
 ## Quick Start
 
 ```bash
