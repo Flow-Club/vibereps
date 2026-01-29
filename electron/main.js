@@ -16,7 +16,7 @@ if (process.platform === 'darwin') {
 // Configuration
 const HTTP_PORT = 8800;  // Different from webapp's 8765-8774 range
 const WINDOW_WIDTH = 400;
-const WINDOW_HEIGHT = 700;
+const WINDOW_HEIGHT = 800;
 
 // Global references
 let tray = null;
@@ -567,7 +567,16 @@ function createWindow() {
     }
   });
 
+  mainWindow.on('hide', () => {
+    // Tell renderer to stop camera when window hides
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-hide');
+    }
+  });
+
   mainWindow.on('show', () => {
+    // Tell renderer window is visible (can restart camera if needed)
+    mainWindow.webContents.send('window-show');
     // Send current sessions to renderer
     mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
     // Inject mediapipe path for local loading

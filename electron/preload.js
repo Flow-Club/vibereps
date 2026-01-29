@@ -54,6 +54,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (event, path) => callback(path);
     ipcRenderer.on('mediapipe-path', handler);
     return () => ipcRenderer.removeListener('mediapipe-path', handler);
+  },
+
+  // Subscribe to window visibility changes (for camera control)
+  onWindowHide: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('window-hide', handler);
+    return () => ipcRenderer.removeListener('window-hide', handler);
+  },
+
+  onWindowShow: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('window-show', handler);
+    return () => ipcRenderer.removeListener('window-show', handler);
   }
 });
 

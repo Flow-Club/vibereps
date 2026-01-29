@@ -2378,6 +2378,26 @@ const selector = document.getElementById('exerciseSelector');
             window.electronAPI.getSessions().then(sessions => {
                 updateSessionSelector(sessions);
             }).catch(err => console.error('Failed to get sessions:', err));
+
+            // Stop camera when window is hidden to save resources and turn off camera light
+            window.electronAPI.onWindowHide(() => {
+                console.log('Window hidden - stopping camera');
+                const video = document.getElementById('videoElement');
+                if (video && video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+                if (camera) {
+                    camera.stop();
+                    camera = null;
+                }
+            });
+
+            // Restart camera when window is shown (if we're in an exercise)
+            window.electronAPI.onWindowShow(() => {
+                console.log('Window shown');
+                // Don't auto-restart camera - user will click Start when ready
+            });
         }
 
         // ============================================
