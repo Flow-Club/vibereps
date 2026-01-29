@@ -61,7 +61,7 @@ choose_ui_mode() {
     echo ""
 
     while true; do
-        read -p "Enter choice [1/2]: " -n 1 -r choice
+        read -p "Enter choice [1/2]: " -n 1 -r choice < /dev/tty
         echo ""
         case "$choice" in
             1)
@@ -102,7 +102,7 @@ choose_trigger_mode() {
     echo ""
 
     while true; do
-        read -p "Enter choice [1/2]: " -n 1 -r choice
+        read -p "Enter choice [1/2]: " -n 1 -r choice < /dev/tty
         echo ""
         case "$choice" in
             1)
@@ -494,7 +494,7 @@ PYTHON_SCRIPT
 
     # Remove Electron app if installed
     if [[ -d "/Applications/VibeReps.app" ]]; then
-        read -p "Remove /Applications/VibeReps.app? [y/N] " -n 1 -r
+        read -p "Remove /Applications/VibeReps.app? [y/N] " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "/Applications/VibeReps.app"
@@ -504,7 +504,7 @@ PYTHON_SCRIPT
 
     # Optionally remove install directory
     if [[ -d "$INSTALL_DIR" ]] && [[ "$INSTALL_DIR" == "$HOME/.vibereps" ]]; then
-        read -p "Remove $INSTALL_DIR? [y/N] " -n 1 -r
+        read -p "Remove $INSTALL_DIR? [y/N] " -n 1 -r < /dev/tty
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$INSTALL_DIR"
