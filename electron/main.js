@@ -242,7 +242,7 @@ function setupHttpServer() {
     updateTrayTooltip();
 
     // Notify renderer of new session
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
     }
 
@@ -260,7 +260,7 @@ function setupHttpServer() {
 
     if (sessionData) {
       // Notify renderer
-      if (mainWindow) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('session-activity', { session_id, tool_name, file_path });
         mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
       }
@@ -285,8 +285,8 @@ function setupHttpServer() {
       sessionManager.markComplete(session_id);
     }
 
-    // Update renderer
-    if (mainWindow) {
+    // Update renderer (check isDestroyed to avoid "Object has been destroyed" errors)
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('claude-complete', { session_id, message });
       mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
     }
@@ -322,7 +322,7 @@ function setupHttpServer() {
       logged = true;
 
       // Notify renderer
-      if (mainWindow) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('exercise-complete', logEntry);
       }
 
@@ -370,7 +370,7 @@ function setupHttpServer() {
   });
 
   expressApp.post('/notify', (req, res) => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('claude-complete', req.body);
     }
     res.json({ success: true });
