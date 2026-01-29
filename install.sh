@@ -31,6 +31,9 @@ UI_MODE="${VIBEREPS_UI_MODE:-}"
 # Trigger mode: prompt (experimental) or edit-only (default: prompt user)
 TRIGGER_MODE="${VIBEREPS_TRIGGER_MODE:-}"
 
+# Remote sync: enable remote stats and leaderboard (default: prompt user)
+REMOTE_SYNC="${VIBEREPS_REMOTE_SYNC:-}"
+
 # Check if we're running from an existing clone/dev install
 detect_local_install() {
     if [[ -f "$(dirname "${BASH_SOURCE[0]}")/exercise_tracker.py" ]]; then
@@ -121,6 +124,60 @@ choose_trigger_mode() {
         esac
     done
     echo ""
+}
+
+# Prompt user for remote sync setup
+setup_remote_sync() {
+    if [[ "$REMOTE_SYNC" == "skip" ]]; then
+        return 0
+    fi
+
+    echo ""
+    echo -e "${BLUE}Remote Stats & Leaderboard (Optional)${NC}"
+    echo ""
+    echo "  Enable remote sync to:"
+    echo "  • See your stats on the global leaderboard"
+    echo "  • Track your streak across devices"
+    echo "  • Compare with other Claude Code users"
+    echo ""
+    echo "  Your exercise data (reps, timestamps) will be sent to our server."
+    echo "  Video/images NEVER leave your browser."
+    echo ""
+
+    read -p "Enable remote sync? [y/N] " -n 1 -r
+    echo ""
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_step "Skipping remote sync (exercises logged locally only)"
+        return 0
+    fi
+
+    echo ""
+    echo "  Choose a display name for the leaderboard."
+    echo "  This is public - use something fun, not your real name."
+    echo "  Leave blank for anonymous (anon_XXXX)."
+    echo ""
+
+    read -p "Display name: " display_name
+
+    # Run the Python setup script
+    if [[ -f "$INSTALL_DIR/vibereps_setup.py" ]]; then
+        print_step "Setting up remote sync..."
+
+        # Create config directory if needed
+        mkdir -p "$HOME/.vibereps"
+
+        python3 "$INSTALL_DIR/vibereps_setup.py" --non-interactive --display-name "${display_name:-}" 2>/dev/null || {
+            # If non-interactive mode fails, fall back to just running it
+            echo ""
+            print_warning "Quick setup failed. Run './vibereps_setup.py' manually to complete setup."
+            return 0
+        }
+
+        print_success "Remote sync configured!"
+    else
+        print_warning "Setup script not found. Run 'vibereps_setup.py' after installation."
+    fi
 }
 
 # Install Electron menubar app
@@ -418,6 +475,22 @@ show_summary() {
     echo -e "  ${BLUE}Customize exercises (optional):${NC}"
     echo -e "    Run ${GREEN}/setup-vibereps${NC} in Claude Code to change exercise types"
     echo ""
+
+    # Check if remote sync is enabled
+    if [[ -f "$HOME/.vibereps/config.json" ]]; then
+        if python3 -c "import json; c=json.load(open('$HOME/.vibereps/config.json')); exit(0 if c.get('remote_sync',{}).get('enabled') else 1)" 2>/dev/null; then
+            DISPLAY_NAME=$(python3 -c "import json; c=json.load(open('$HOME/.vibereps/config.json')); print(c.get('remote_sync',{}).get('display_name','unknown'))" 2>/dev/null)
+            echo -e "  ${BLUE}Remote Sync:${NC} ${GREEN}Enabled${NC} as '${DISPLAY_NAME}'"
+            echo "    Your stats will appear on the global leaderboard"
+        else
+            echo -e "  ${BLUE}Remote Sync:${NC} Disabled (local logging only)"
+            echo "    Run './vibereps_setup.py' to enable leaderboard"
+        fi
+    else
+        echo -e "  ${BLUE}Remote Sync:${NC} Disabled (local logging only)"
+        echo "    Run './vibereps_setup.py' to enable leaderboard"
+    fi
+    echo ""
     echo -e "  ${BLUE}How it works:${NC}"
     if [[ "$TRIGGER_MODE" == "prompt" ]]; then
         if [[ "$UI_MODE" == "electron" ]]; then
@@ -534,6 +607,7 @@ case "${1:-}" in
         echo "  VIBEREPS_TRIGGER_MODE   Trigger mode: 'edit-only' or 'prompt' (default: prompt user)"
         echo "                          'edit-only' = trigger on file edits only (recommended)"
         echo "                          'prompt' = also trigger on prompt submit (experimental)"
+        echo "  VIBEREPS_REMOTE_SYNC    Remote sync: 'skip' to skip prompt (default: prompt user)"
         echo ""
         echo "Examples:"
         echo "  # Install from GitHub (interactive)"
@@ -579,4 +653,5 @@ fi
 setup_permissions
 backup_settings
 configure_hooks
+setup_remote_sync
 show_summary

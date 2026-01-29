@@ -102,13 +102,44 @@ Replace:
 
 Use Edit tool to update the settings file, preserving other settings.
 
-### Step 6: Summary
+### Step 6: Ask About Remote Sync (Optional)
+
+```
+Question: "Enable remote stats and leaderboard?"
+Header: "Sync"
+MultiSelect: false
+Options:
+- "No, keep local only (Recommended)": "Exercises logged to ~/.vibereps/exercises.jsonl only"
+- "Yes, enable remote sync": "See your stats on the global leaderboard, track streaks"
+```
+
+If they choose "Yes":
+1. Ask for display name with AskUserQuestion:
+   ```
+   Question: "Choose a display name for the leaderboard (leave blank for anonymous)"
+   Header: "Name"
+   Options:
+   - "Anonymous": "You'll be assigned a random name like anon_a3f2"
+   - "Custom name": "Choose your own public display name"
+   ```
+
+2. Run the setup script:
+   ```bash
+   {vibereps_dir}/vibereps_setup.py --non-interactive --display-name "{display_name}"
+   ```
+
+3. Show result:
+   - If successful: "Remote sync enabled! Your display name: {name}"
+   - If failed: "Setup failed. You can run './vibereps_setup.py' later to try again."
+
+### Step 7: Summary
 
 Show a summary:
 ```
 Setup complete!
 
 Selected exercises: squats, jumping_jacks, shoulder_shrugs, neck_rotations
+Remote sync: {enabled/disabled} {display_name if enabled}
 
 How it works:
 1. Claude edits a file → Exercise tracker launches
@@ -121,6 +152,7 @@ Useful commands:
 - /tune-detection   - Adjust detection if reps aren't counting
 
 To change exercises later, run /setup-vibereps again.
+To enable/disable remote sync, run: {vibereps_dir}/vibereps_setup.py
 ```
 
 ## Important Notes
