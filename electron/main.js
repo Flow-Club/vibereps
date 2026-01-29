@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, session, nativeImage, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, session, nativeImage, Notification, screen } = require('electron');
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +16,7 @@ if (process.platform === 'darwin') {
 // Configuration
 const HTTP_PORT = 8800;  // Different from webapp's 8765-8774 range
 const WINDOW_WIDTH = 400;
-const WINDOW_HEIGHT = 600;
+const WINDOW_HEIGHT = 700;
 
 // Global references
 let tray = null;
@@ -37,6 +37,55 @@ const mediapipePath = isDev
   ? path.join(__dirname, 'assets', 'mediapipe')
   : path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'mediapipe');
 const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
+const configPath = path.join(os.homedir(), '.vibereps', 'config.json');
+
+// Load/save window bounds to remember position across sessions
+function loadWindowBounds() {
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.windowBounds) {
+        // Validate the saved position is still on a valid display
+        const bounds = config.windowBounds;
+        const displays = screen.getAllDisplays();
+        const isOnScreen = displays.some(display => {
+          const { x, y, width, height } = display.bounds;
+          // Check if window center is within this display
+          const centerX = bounds.x + bounds.width / 2;
+          const centerY = bounds.y + bounds.height / 2;
+          return centerX >= x && centerX < x + width && centerY >= y && centerY < y + height;
+        });
+        if (isOnScreen) {
+          return bounds;
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore errors, use defaults
+  }
+  return null;
+}
+
+function saveWindowBounds(bounds) {
+  try {
+    const configDir = path.dirname(configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (e) {
+        // Start fresh if corrupted
+      }
+    }
+    config.windowBounds = bounds;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  } catch (e) {
+    // Ignore save errors
+  }
+}
 
 // Get today's date in YYYY-MM-DD format (local timezone)
 function getTodayDate() {
@@ -461,9 +510,11 @@ function setupPermissions() {
 
 // Create the main window
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+  // Load saved window bounds or use defaults
+  const savedBounds = loadWindowBounds();
+  const windowOptions = {
+    width: savedBounds?.width || WINDOW_WIDTH,
+    height: savedBounds?.height || WINDOW_HEIGHT,
     show: false,  // Start hidden
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -476,13 +527,39 @@ function createWindow() {
     minimizable: true,
     maximizable: false,
     title: 'VibeReps'
-  });
+  };
+
+  // Set position if we have saved bounds
+  if (savedBounds) {
+    windowOptions.x = savedBounds.x;
+    windowOptions.y = savedBounds.y;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
+
+  // Save window position/size when moved or resized
+  let saveTimeout = null;
+  const debouncedSave = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        saveWindowBounds(mainWindow.getBounds());
+      }
+    }, 500);  // Debounce to avoid excessive writes
+  };
+
+  mainWindow.on('move', debouncedSave);
+  mainWindow.on('resize', debouncedSave);
 
   // Load from HTTP server so MediaPipe paths work correctly
   // Load with electron=true for Electron-specific features
   mainWindow.loadURL(`http://localhost:${HTTP_PORT}/?electron=true`);
 
   mainWindow.on('close', (event) => {
+    // Save bounds before closing
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      saveWindowBounds(mainWindow.getBounds());
+    }
     // Hide instead of close (unless app is quitting)
     if (!app.isQuitting) {
       event.preventDefault();
