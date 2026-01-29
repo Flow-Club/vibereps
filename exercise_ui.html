@@ -2393,10 +2393,14 @@ const selector = document.getElementById('exerciseSelector');
                 }
             });
 
-            // Restart camera when window is shown (if we're in an exercise)
+            // Enumerate cameras when window is first shown
+            let camerasEnumerated = false;
             window.electronAPI.onWindowShow(() => {
                 console.log('Window shown');
-                // Don't auto-restart camera - user will click Start when ready
+                if (!camerasEnumerated) {
+                    camerasEnumerated = true;
+                    enumerateCameras();
+                }
             });
         }
 
@@ -2408,9 +2412,13 @@ const selector = document.getElementById('exerciseSelector');
             // Don't shutdown in Electron - we're a persistent app
             window.removeEventListener('beforeunload', notifyShutdown);
             window.removeEventListener('pagehide', notifyShutdown);
+            // Don't enumerate cameras yet - wait for window to be shown
+            // (enumerateCameras calls getUserMedia which activates the camera light)
+        } else {
+            // For browser mode, enumerate cameras immediately
+            enumerateCameras();
         }
         loadClaudeContext();
-        enumerateCameras();
         loadExercises();
 
         // Poll for context updates every 3 seconds
