@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-29
+
+### Added
+- Window position memory - Electron app remembers where you put it
+- `vibereps-usage.py` documentation with demo GIF in README and docs
+- Architecture diagrams updated to show local JSONL logging flow
+
+### Fixed
+- Camera light stays off until window is actually shown (deferred enumeration)
+- Camera stops when Electron window is hidden (no more always-on light)
+- Window bounds validation requires 100px visible (prevents off-screen windows)
+- Fixed 'Object has been destroyed' errors in Electron
+- Fixed exercise logging in Electron - use IPC instead of HTTP
+- Fixed IndentationError in exercise_tracker.py for UserPromptSubmit hook
+- Fixed MediaPipe loading race conditions
+
+### Changed
+- Responsive UI scaling with distance-based font sizing
+- Updated hooks documentation to mark prompt trigger mode as experimental
+- Added attribution to ccusage as inspiration for usage tracking
+
 ## [0.2.0] - 2026-01-28
 
 ### Added
