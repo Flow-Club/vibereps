@@ -54,13 +54,44 @@ class ExerciseLog(BaseModel):
 
 
 class UserCreate(BaseModel):
-    username: str
+    username: Optional[str] = None  # If not provided, generates anon_XXXX
 
 
 class UserResponse(BaseModel):
     id: int
     username: str
     api_key: str
+
+
+class DisplayNameUpdate(BaseModel):
+    display_name: str
+
+
+def generate_anonymous_name() -> str:
+    """Generate an anonymous display name like 'anon_a3f2'."""
+    return f"anon_{secrets.token_hex(2)}"
+
+
+def validate_display_name(name: str) -> tuple[bool, str]:
+    """Validate display name format.
+
+    Returns (is_valid, error_message).
+    """
+    if not name:
+        return False, "Display name cannot be empty"
+
+    if len(name) < 3:
+        return False, "Display name must be at least 3 characters"
+
+    if len(name) > 20:
+        return False, "Display name must be 20 characters or less"
+
+    # Allow alphanumeric, underscore, hyphen
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
+    if not all(c in allowed for c in name):
+        return False, "Display name can only contain letters, numbers, underscores, and hyphens"
+
+    return True, ""
 
 
 class StatsResponse(BaseModel):
@@ -100,18 +131,84 @@ app = FastAPI(
 
 @app.post("/api/users", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    """Create a new user and return API key."""
-    existing = db.query(User).filter(User.username == user.username).first()
+    """Create a new user and return API key.
+
+    If username is not provided or empty, generates an anonymous name (anon_XXXX).
+    """
+    username = user.username.strip() if user.username else None
+
+    if username:
+        # Validate provided username
+        valid, error = validate_display_name(username)
+        if not valid:
+            raise HTTPException(status_code=422, detail=error)
+    else:
+        # Generate anonymous name, ensuring uniqueness
+        for _ in range(10):  # Try up to 10 times
+            username = generate_anonymous_name()
+            existing = db.query(User).filter(User.username == username).first()
+            if not existing:
+                break
+        else:
+            raise HTTPException(status_code=500, detail="Could not generate unique anonymous name")
+
+    # Check for existing username
+    existing = db.query(User).filter(User.username == username).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=409, detail="Username already exists")
 
     api_key = secrets.token_hex(32)
-    db_user = User(username=user.username, api_key=api_key)
+    db_user = User(username=username, api_key=api_key)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
     return UserResponse(id=db_user.id, username=db_user.username, api_key=api_key)
+
+
+@app.put("/api/users/me/display-name")
+def update_display_name(
+    update: DisplayNameUpdate,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Update the user's display name.
+
+    Allows changing from anonymous to chosen name, or changing names.
+    """
+    new_name = update.display_name.strip()
+
+    # Validate new name
+    valid, error = validate_display_name(new_name)
+    if not valid:
+        raise HTTPException(status_code=422, detail=error)
+
+    # Check if name is taken (by someone else)
+    existing = db.query(User).filter(User.username == new_name).first()
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=409, detail="Display name already taken")
+
+    old_name = user.username
+    user.username = new_name
+    db.commit()
+
+    return {
+        "status": "updated",
+        "old_display_name": old_name,
+        "new_display_name": new_name
+    }
+
+
+@app.get("/api/users/me")
+def get_current_user(user: User = Depends(require_user)):
+    """Get current user's profile."""
+    return {
+        "id": user.id,
+        "username": user.username,
+        "daily_rep_goal": user.daily_rep_goal,
+        "daily_session_goal": user.daily_session_goal,
+        "created_at": user.created_at.isoformat() if user.created_at else None
+    }
 
 
 @app.post("/api/log")
@@ -398,6 +495,28 @@ MCP_TOOLS = [
                 }
             }
         }
+    },
+    {
+        "name": "get_my_profile",
+        "description": "Get the user's profile including display name, goals, and rank",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "update_display_name",
+        "description": "Update the user's display name (shown on leaderboard)",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "description": "New display name (3-20 chars, alphanumeric/underscore/hyphen)"
+                }
+            },
+            "required": ["display_name"]
+        }
     }
 ]
 
@@ -532,6 +651,58 @@ def handle_mcp_tool_call(tool_name: str, arguments: dict, user: User, db: Sessio
             },
             "exercises": exercise_totals,
             "total_reps": sum(exercise_totals.values())
+        }
+
+    elif tool_name == "get_my_profile":
+        # Get user's rank on leaderboard
+        results = (
+            db.query(
+                User.id,
+                func.sum(Exercise.reps).label("total_reps")
+            )
+            .join(Exercise)
+            .group_by(User.id)
+            .order_by(func.sum(Exercise.reps).desc())
+            .all()
+        )
+        rank = None
+        total_reps = 0
+        for i, r in enumerate(results):
+            if r.id == user.id:
+                rank = i + 1
+                total_reps = r.total_reps
+                break
+
+        return {
+            "display_name": user.username,
+            "rank": rank,
+            "total_reps": total_reps,
+            "daily_rep_goal": user.daily_rep_goal,
+            "daily_session_goal": user.daily_session_goal,
+            "member_since": user.created_at.isoformat() if user.created_at else None
+        }
+
+    elif tool_name == "update_display_name":
+        new_name = arguments.get("display_name", "").strip()
+
+        # Validate
+        valid, error = validate_display_name(new_name)
+        if not valid:
+            raise ValueError(error)
+
+        # Check uniqueness
+        existing = db.query(User).filter(User.username == new_name).first()
+        if existing and existing.id != user.id:
+            raise ValueError("Display name already taken")
+
+        old_name = user.username
+        user.username = new_name
+        db.commit()
+
+        return {
+            "status": "updated",
+            "old_display_name": old_name,
+            "new_display_name": new_name
         }
 
     else:

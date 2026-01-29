@@ -16,6 +16,19 @@ import subprocess
 import urllib.request
 import urllib.error
 
+# Import config module (with fallback for standalone use)
+try:
+    from vibereps_config import get_remote_settings, is_local_logging_enabled
+except ImportError:
+    # Fallback if config module not available
+    def get_remote_settings():
+        url = os.getenv("VIBEREPS_API_URL", "").strip()
+        key = os.getenv("VIBEREPS_API_KEY", "").strip()
+        return (url, key) if url and key else None
+
+    def is_local_logging_enabled():
+        return True
+
 # Electron app port (different from webapp's 8765-8774 range)
 ELECTRON_PORT = 8800
 ELECTRON_APP_PATH = "/Applications/VibeReps.app"
@@ -109,12 +122,16 @@ Event types:
   user_prompt_submit Quick mode (5 reps while Claude works)
   task_complete     Normal mode (10 reps after Claude finishes)
 
-Environment variables:
+Configuration:
+  Settings are loaded from ~/.vibereps/config.json
+  Run 'vibereps_setup.py' to configure remote sync interactively
+
+Environment variables (override config file):
   VIBEREPS_EXERCISES     Comma-separated list of exercises to use
-  VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY  Set to 1 to --dangerously-skip-leg-day
+  VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY  Set to 1 to skip leg exercises
   VIBEREPS_DISABLED      Set to 1 to disable tracking
-  VIBEREPS_API_URL       Remote server URL for logging
-  VIBEREPS_API_KEY       API key for remote server
+  VIBEREPS_API_URL       Remote server URL (overrides config)
+  VIBEREPS_API_KEY       API key for remote server (overrides config)
 """)
     sys.exit(0)
 
@@ -123,9 +140,8 @@ if os.getenv("VIBEREPS_DISABLED", ""):
     print('{"status": "skipped", "message": "VIBEREPS_DISABLED is set"}')
     sys.exit(0)
 
-# Configuration - set these environment variables or edit directly
-VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
-VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
+# Configuration - env vars or ~/.vibereps/config.json (env vars take precedence)
+# Remote sync settings are loaded via get_remote_settings() from config module
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 
@@ -372,7 +388,13 @@ def open_small_window(url: str, width: int = 340, height: int = 700):
 
 
 def log_to_local(exercise: str, reps: int, duration: int = 0, mode: str = "normal") -> bool:
-    """Log exercise data to local JSONL file for ccusage integration."""
+    """Log exercise data to local JSONL file for ccusage integration.
+
+    Respects the local_logging setting in config (default: enabled).
+    """
+    if not is_local_logging_enabled():
+        return False
+
     from datetime import datetime
 
     log_dir = Path.home() / ".vibereps"
@@ -398,12 +420,18 @@ def log_to_local(exercise: str, reps: int, duration: int = 0, mode: str = "norma
 
 
 def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
-    """Send exercise data to remote VibeReps server."""
-    if not VIBEREPS_API_URL or not VIBEREPS_API_KEY:
-        return False  # Remote logging disabled
+    """Send exercise data to remote VibeReps server.
+
+    Uses settings from config file or env vars (env vars take precedence).
+    """
+    remote = get_remote_settings()
+    if not remote:
+        return False  # Remote sync not enabled or not configured
+
+    api_url, api_key = remote
 
     try:
-        url = f"{VIBEREPS_API_URL.rstrip('/')}/api/log"
+        url = f"{api_url.rstrip('/')}/api/log"
         data = json.dumps({"exercise": exercise, "reps": reps, "duration": duration}).encode()
 
         req = urllib.request.Request(
@@ -411,7 +439,7 @@ def log_to_remote(exercise: str, reps: int, duration: int = 0) -> bool:
             data=data,
             headers={
                 "Content-Type": "application/json",
-                "X-API-Key": VIBEREPS_API_KEY
+                "X-API-Key": api_key
             },
             method="POST"
         )
