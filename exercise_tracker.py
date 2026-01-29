@@ -942,8 +942,6 @@ class ExerciseTrackerHook:
         self.write_port_file()
 
         url = f"http://localhost:{self.port}"
-        if quick_mode:
-            # quick mode removed - always use normal reps
         return url
 
     def wait_for_completion(self, timeout=600):
