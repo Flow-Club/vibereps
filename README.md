@@ -21,6 +21,12 @@ Do exercises and think a little yourself while you wait for Claude.
 curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 ```
 
+This installs the **menubar app** (recommended). For browser-only mode:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash -s -- --webapp
+```
+
 Then restart Claude Code and run **`/setup-vibereps`** to choose your exercises.
 
 <details>

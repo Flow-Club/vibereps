@@ -46,6 +46,13 @@ choose_ui_mode() {
         return 0
     fi
 
+    # Default to electron when not interactive (e.g., piped from curl)
+    if [[ ! -t 0 ]]; then
+        UI_MODE="electron"
+        print_step "Defaulting to Menubar App (use --webapp for browser)"
+        return 0
+    fi
+
     echo ""
     echo -e "${BLUE}Choose your preferred UI:${NC}"
     echo ""
@@ -85,6 +92,13 @@ choose_ui_mode() {
 # Prompt user to choose trigger mode
 choose_trigger_mode() {
     if [[ -n "$TRIGGER_MODE" ]]; then
+        return 0
+    fi
+
+    # Default to edit-only when not interactive (e.g., piped from curl)
+    if [[ ! -t 0 ]]; then
+        TRIGGER_MODE="edit-only"
+        print_step "Defaulting to edit-only triggers (use --prompt-trigger for experimental)"
         return 0
     fi
 
@@ -517,42 +531,49 @@ PYTHON_SCRIPT
 }
 
 # Parse arguments
-case "${1:-}" in
-    --uninstall|-u)
-        uninstall
-        exit 0
-        ;;
-    --help|-h)
-        echo "VibeReps Installer"
-        echo ""
-        echo "Usage: install.sh [OPTIONS]"
-        echo ""
-        echo "Options:"
-        echo "  --uninstall, -u    Remove VibeReps from Claude Code"
-        echo "  --help, -h         Show this help message"
-        echo ""
-        echo "Environment variables:"
-        echo "  VIBEREPS_INSTALL_DIR    Custom install directory (default: ~/.vibereps)"
-        echo "  VIBEREPS_UI_MODE        UI mode: 'electron' or 'webapp' (default: prompt)"
-        echo "  VIBEREPS_TRIGGER_MODE   Trigger mode: 'edit-only' or 'prompt' (default: prompt user)"
-        echo "                          'edit-only' = trigger on file edits only (recommended)"
-        echo "                          'prompt' = also trigger on prompt submit (experimental)"
-        echo ""
-        echo "Examples:"
-        echo "  # Install from GitHub (interactive)"
-        echo "  curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash"
-        echo ""
-        echo "  # Install menubar app non-interactively"
-        echo "  VIBEREPS_UI_MODE=electron VIBEREPS_TRIGGER_MODE=edit-only ./install.sh"
-        echo ""
-        echo "  # Install with experimental prompt detection"
-        echo "  VIBEREPS_TRIGGER_MODE=prompt ./install.sh"
-        echo ""
-        echo "  # Uninstall"
-        echo "  ~/.vibereps/install.sh --uninstall"
-        exit 0
-        ;;
-esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --uninstall|-u)
+            uninstall
+            exit 0
+            ;;
+        --webapp|--browser)
+            UI_MODE="webapp"
+            shift
+            ;;
+        --prompt-trigger)
+            TRIGGER_MODE="prompt"
+            shift
+            ;;
+        --help|-h)
+            echo "VibeReps Installer"
+            echo ""
+            echo "Usage: install.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --webapp           Use web browser instead of menubar app"
+            echo "  --prompt-trigger   Enable experimental prompt-based triggering"
+            echo "  --uninstall, -u    Remove VibeReps from Claude Code"
+            echo "  --help, -h         Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  # Install (defaults to menubar app + edit-only triggers)"
+            echo "  curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash"
+            echo ""
+            echo "  # Install with web browser UI instead"
+            echo "  curl -sSL .../install.sh | bash -s -- --webapp"
+            echo ""
+            echo "  # Uninstall"
+            echo "  ~/.vibereps/install.sh --uninstall"
+            exit 0
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            echo "Run with --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 # Main installation
 echo ""
