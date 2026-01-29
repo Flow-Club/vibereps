@@ -63,15 +63,17 @@ Native macOS app providing:
 - Always-on menubar presence with stats
 - Multi-instance Claude session tracking via SessionManager
 - Native notifications
-- Bundled MediaPipe for offline use
 - Express HTTP API on port 8800
+- Bundled MediaPipe for offline use *(coming soon)*
 
 Key files:
 - `main.js`: Main process, Express server, tray management
 - `session-manager.js`: Tracks Claude instances (10-min timeout)
 - `preload.js`: Secure IPC bridge
 
-### Remote Server (`server/main.py`)
+### Remote Server (`server/main.py`) *(coming soon)*
+
+> **Note:** The remote server is not yet deployed. Currently all exercise data is logged locally to `~/.vibereps/exercises.jsonl`.
 
 - **REST API** (`/api/*`) - For local hook to POST exercise sessions
 - **MCP HTTP Transport** (`/mcp`) - For Claude Code to query stats

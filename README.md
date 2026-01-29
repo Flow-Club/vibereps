@@ -53,7 +53,7 @@ For a more integrated experience, use the **VibeReps menubar app**:
 - Random exercise auto-selection
 - Native desktop notifications
 - Multi-instance Claude session tracking
-- Works offline (bundled MediaPipe)
+- Offline mode with bundled MediaPipe *(coming soon)*
 
 ### Install Menubar App
 
@@ -188,9 +188,9 @@ export VIBEREPS_EXERCISES=squats,pushups,jumping_jacks,standing_crunches,calf_ra
 # --dangerously-skip-leg-day (filters out squats, calf raises, high knees, jumping jacks)
 export VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1
 
-# Remote VibeReps server (optional)
-export VIBEREPS_API_URL=https://your-server.com
-export VIBEREPS_API_KEY=your_api_key
+# Remote VibeReps server (coming soon - not yet deployed)
+# export VIBEREPS_API_URL=https://your-server.com
+# export VIBEREPS_API_KEY=your_api_key
 
 # Disable tracking entirely
 export VIBEREPS_DISABLED=1
@@ -340,16 +340,16 @@ Combines ccusage output with your exercise log into a single table:
 
 ## 📚 More Info
 
-- `CLAUDE.md` - Technical architecture, remote server setup, and monitoring stack
+- `CLAUDE.md` - Technical architecture and implementation details
 - `exercise_ui.html` - UI and pose detection logic (customize reps and sensitivity here)
-- `server/` - Remote server for multi-user stats, leaderboards, and MCP integration
+- `server/` - Remote server for multi-user stats, leaderboards, and MCP integration *(coming soon)*
 
 ## 💡 Tips
 
-- **Too easy?** Increase reps in quick mode
+- **Too easy?** Increase reps or choose harder exercises
 - **Too hard?** Decrease reps or choose easier exercises
 - **Want variety?** The tracker suggests exercises you haven't done recently
-- **Track progress?** Set up the MCP server for stats and streaks
+- **Track progress?** Use `./vibereps-usage.py` to see stats alongside Claude Code usage
 
 ---
 
