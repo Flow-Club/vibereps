@@ -2,6 +2,10 @@
 
 View your Claude Code usage alongside exercise data with `vibereps-usage`.
 
+<p align="center">
+  <img src="/vibereps-usage.gif" alt="vibereps-usage demo" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+</p>
+
 ## Quick Start
 
 ```bash
@@ -10,19 +14,6 @@ View your Claude Code usage alongside exercise data with `vibereps-usage`.
 
 # Or run from anywhere
 python ~/.vibereps/vibereps-usage.py
-```
-
-## Output
-
-```
-==================================================================================================================================
-Date         Models                              Input       Output          Total       Cost Exercises
-==================================================================================================================================
-2026-01-05   haiku-4-5, opus-4-5                21,091        2,937      3,033,566     $25.21 15 squats, 10 JJ
-2026-01-06   haiku-4-5, opus-4-5               113,396       10,142      5,548,007     $53.68 20 squats, 15 calf raises
-2026-01-07   haiku-4-5, opus-4-5                66,590        9,252      6,984,936     $66.70 25 squats
-==================================================================================================================================
-Total                                          201,077       22,331     15,566,509    $145.59 60 squats, 25 calf raises, 10 JJ
 ```
 
 ## How It Works
