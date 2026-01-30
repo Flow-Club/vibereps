@@ -1,6 +1,10 @@
 # Remote Server
 
-The optional remote server provides stats, leaderboards, and streaks across multiple users.
+::: warning IN PROGRESS
+The remote server is **not yet deployed**. This documentation is for future reference. Currently, all exercise data is logged locally to `~/.vibereps/exercises.jsonl`.
+:::
+
+The optional remote server will provide stats, leaderboards, and streaks across multiple users.
 
 ## Features
 

@@ -55,7 +55,8 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/Flow-Club/vibereps' }
+      { icon: 'github', link: 'https://github.com/Flow-Club/vibereps' },
+      { icon: 'x', link: 'https://x.com/vibereps' }
     ],
 
     footer: {

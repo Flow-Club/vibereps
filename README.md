@@ -105,11 +105,9 @@ You: "Hey Claude, refactor this code"
     ↓
 You exercise ← → Claude processes your request
     ↓
-Exercise complete → "⏳ Claude is working..."
+Exercise complete → "⏳ Waiting for Claude..."
     ↓
-Claude: "Here's your refactored code"
-    ↓
-🔔 Desktop notification: "Claude is ready!"
+Claude finishes → App shows "Ready!"
     ↓
 You return to check the response
 ```
