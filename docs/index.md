@@ -46,6 +46,19 @@ Claude: "Here's your refactored code"
 You return to check the response
 ```
 
+## See It In Action
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin: 1.5rem 0;">
+  <iframe
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 8px;"
+    src="https://www.youtube.com/embed/S0owNK_xSCA"
+    title="VibeReps Demo"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen>
+  </iframe>
+</div>
+
 ## Quick Install
 
 ```bash
