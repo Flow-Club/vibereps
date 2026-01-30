@@ -342,7 +342,8 @@ function setupHttpServer() {
     }
 
     // Show desktop notification
-    if (Notification.isSupported()) {
+    const notificationShown = Notification.isSupported();
+    if (notificationShown) {
       new Notification({
         title: 'Claude Finished',
         body: message || 'Claude has completed the task'
@@ -350,7 +351,7 @@ function setupHttpServer() {
     }
 
     updateTrayTooltip();
-    res.json({ success: true });
+    res.json({ success: true, notification_shown: notificationShown });
   });
 
   // API: Exercise completed

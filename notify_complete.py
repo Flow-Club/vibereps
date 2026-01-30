@@ -31,7 +31,7 @@ def get_session_id_file(cwd: str = None):
 
 def read_hook_payload_from_stdin() -> dict:
     """Read Claude Code hook payload from stdin (non-blocking)."""
-    if select.select([sys.stdin], [], [], 0.1)[0]:
+    if select.select([sys.stdin], [], [], 0.5)[0]:
         try:
             return json.load(sys.stdin)
         except (json.JSONDecodeError, ValueError):
@@ -53,13 +53,30 @@ def is_electron_app_running():
 
 
 def get_session_id(cwd: str = None):
-    """Get the current session ID if available."""
+    """Get the current session ID if available.
+
+    First tries exact match (ppid + cwd hash), then falls back to
+    searching for any session file with matching ppid in case
+    the notification fires from a different directory than the
+    original PostToolUse hook.
+    """
+    # Try exact match first
     session_id_file = get_session_id_file(cwd)
     if session_id_file.exists():
         try:
             return session_id_file.read_text().strip()
         except OSError:
             pass
+
+    # Fallback: find any session file for this PPID
+    # This handles cases where cwd differs between hooks
+    ppid = os.getppid()
+    for f in Path("/tmp").glob(f"vibereps-session-id-{ppid}*"):
+        try:
+            return f.read_text().strip()
+        except OSError:
+            continue
+
     return None
 
 
@@ -162,8 +179,17 @@ def main():
     # First try Electron menubar app
     if is_electron_app_running():
         result = notify_electron_app(hook_data)
-        print(json.dumps(result))
-        return 0 if result["status"] == "success" else 1
+        if result["status"] == "success":
+            # Check if notification actually showed
+            # If Electron is running but notifications aren't supported,
+            # fall through to browser tracker as backup
+            if result.get("result", {}).get("notification_shown", True):
+                print(json.dumps(result))
+                return 0
+            # Fall through to browser tracker
+        else:
+            print(json.dumps(result))
+            return 1
 
     # Fall back to legacy browser-based tracker
     result = notify_exercise_tracker(hook_data)
