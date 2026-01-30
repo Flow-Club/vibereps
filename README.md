@@ -27,7 +27,7 @@ This installs the **menubar app** (recommended). For browser-only mode:
 curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash -s -- --webapp
 ```
 
-Then restart Claude Code and run **`/setup-vibereps`** to choose your exercises.
+Then restart Claude Code and run **`/vibereps`** to choose your exercises.
 
 <details>
 <summary><b>Alternative: Install from local clone</b></summary>
@@ -283,18 +283,27 @@ which python3  # Use this path if needed
 - Ensure exercises are being logged to `~/.vibereps/exercises.jsonl`
 - For Claude usage, ensure `ccusage` is installed: `npm install -g ccusage`
 
-## 🤖 Claude Code Skills
+## 🤖 Claude Code Skill
 
-VibeReps includes built-in skills you can run in Claude Code:
+VibeReps includes a built-in skill you can run in Claude Code:
 
-| Command | Description |
-|---------|-------------|
-| `/setup-vibereps` | Interactive setup wizard - customize exercises and triggers |
-| `/test-tracker` | Launch, restart, or test the exercise tracker |
-| `/add-exercise` | Add a new exercise type with pose detection |
-| `/tune-detection` | Adjust detection thresholds if reps aren't counting correctly |
+```
+/vibereps
+```
 
-**Example:** After installing, run `/setup-vibereps` in Claude Code to pick your preferred exercises.
+The skill handles everything based on context:
+- **Setup/install** → Runs installer or configures hooks
+- **Test/launch** → Starts the exercise tracker
+- **Add exercise** → Guides through creating custom exercises
+- **Tune detection** → Helps adjust thresholds if reps aren't counting
+
+**Example:** After installing, run `/vibereps` in Claude Code to set up your preferred exercises.
+
+### Install via skills.sh
+
+```bash
+npx skills add Flow-Club/vibereps
+```
 
 ## 📊 Usage Statistics
 

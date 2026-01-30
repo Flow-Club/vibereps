@@ -47,6 +47,39 @@ Thumbs.db
 # Claude Code local settings (contains user-specific paths)
 .claude/settings.local.json
 
+# Other AI agent skill directories (created by npx skills init)
+.agent/
+.agents/
+.cline/
+.codebuddy/
+.codex/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.gemini/
+.github/skills/
+.goose/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openclaude/
+.opencode/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+
 # Node modules
 node_modules/
 package-lock.json

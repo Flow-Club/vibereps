@@ -14,7 +14,7 @@ curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh |
 
 Then:
 1. **Restart Claude Code**
-2. **Run `/setup-vibereps`** to choose your exercises
+2. **Run `/vibereps`** to choose your exercises
 
 ## Alternative: Install from Local Clone
 
@@ -87,16 +87,20 @@ VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/exercise_tracker.py post_too
 ~/.vibereps/notify_complete.py '{}'
 ```
 
-## Claude Code Commands
+## Claude Code Skill
 
-After installing, you can use these commands in Claude Code:
+After installing, use the `/vibereps` command in Claude Code. It handles everything based on context:
 
-| Command | Description |
-|---------|-------------|
-| `/setup-vibereps` | **Start here!** Choose standing/seated exercises, pick your favorites |
-| `/test-tracker` | Launch or restart the exercise tracker |
-| `/add-exercise` | Create a custom exercise with pose detection |
-| `/tune-detection` | Adjust detection if reps aren't counting correctly |
+- **Setup/install** → Runs installer or configures hooks
+- **Test/launch** → Starts the exercise tracker
+- **Add exercise** → Guides through creating custom exercises
+- **Tune detection** → Helps adjust thresholds if reps aren't counting
+
+You can also install the skill via [skills.sh](https://skills.sh):
+
+```bash
+npx skills add Flow-Club/vibereps
+```
 
 ## Next Steps
 
