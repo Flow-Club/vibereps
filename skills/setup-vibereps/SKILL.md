@@ -10,7 +10,37 @@ Guide users through vibereps configuration with a friendly setup wizard.
 
 ## Setup Flow
 
-### Step 1: Ask Exercise Mode (Standing vs Seated)
+### Step 1: Choose Installation Method
+
+Use AskUserQuestion to ask how they want to install:
+
+```
+Question: "How would you like to set up vibereps?"
+Header: "Install"
+MultiSelect: false
+Options:
+- "Run installer (Recommended)": "Downloads files, installs menubar app, configures hooks automatically"
+- "Manual configuration": "I already have vibereps files, just configure my hooks"
+```
+
+**If they choose "Run installer":**
+
+Run the installer script:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
+```
+
+The installer will:
+- Download exercise_tracker.py and exercise_ui.html to ~/.vibereps/
+- Install the menubar app (or use --webapp for browser-only)
+- Prompt for exercise selection
+- Configure hooks in ~/.claude/settings.json
+
+After the installer completes, show the summary (Step 6) and skip to the end.
+
+**If they choose "Manual configuration":** Continue to Step 2.
+
+### Step 2: Ask Exercise Mode (Standing vs Seated)
 
 Use AskUserQuestion to ask about exercise preference:
 
@@ -24,7 +54,7 @@ Options:
 - "Seated only": "Desk-friendly - shoulder shrugs, neck stretches"
 ```
 
-### Step 2: Ask Which Exercises
+### Step 3: Ask Which Exercises
 
 Based on their mode choice, show relevant exercises:
 
@@ -46,7 +76,7 @@ Based on their mode choice, show relevant exercises:
 
 Use AskUserQuestion with MultiSelect: true to let them pick specific exercises from the filtered list.
 
-### Step 3: Ask About Custom Exercises
+### Step 4: Ask About Custom Exercises
 
 ```
 Question: "Would you like to add your own custom exercises?"
@@ -61,7 +91,7 @@ If they choose "Yes", tell them:
 - Run `/add-exercise` in Claude Code to create a new exercise with guided setup
 - Or manually create JSON configs in the `exercises/` directory
 
-### Step 4: Find Install Location
+### Step 5: Find Install Location
 
 ```bash
 if [[ -f "$HOME/.vibereps/exercise_tracker.py" ]]; then
@@ -71,7 +101,7 @@ else
 fi
 ```
 
-### Step 5: Configure Hooks
+### Step 6: Configure Hooks
 
 Read existing `~/.claude/settings.json` and update the PostToolUse hook with selected exercises:
 
@@ -104,7 +134,7 @@ Replace:
 
 Use Edit tool to update the settings file, preserving other settings.
 
-### Step 6: Summary
+### Step 7: Summary
 
 Show a summary:
 ```
