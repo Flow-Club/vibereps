@@ -249,6 +249,28 @@ export VIBEREPS_UI_MODE=electron
 export VIBEREPS_TRIGGER_MODE=edit-only
 ```
 
+### Pause/Resume
+
+Temporarily disable vibereps until a specified time:
+
+```bash
+# Pause until end of day (default)
+./exercise_tracker.py --pause
+
+# Pause until specific time
+./exercise_tracker.py --pause "2026-01-30T18:00:00"
+
+# Resume tracking
+./exercise_tracker.py --resume
+
+# Check status
+./exercise_tracker.py --status
+```
+
+Pause state is stored in `~/.vibereps/config.json` as `paused_until` timestamp.
+
+If using the Electron menubar app, you can also toggle pause from the tray menu.
+
 ### 2. Hook Setup
 
 Exercise after code edits! Add to `~/.claude/settings.json`:

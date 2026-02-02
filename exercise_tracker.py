@@ -102,6 +102,9 @@ if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
 Usage:
   exercise_tracker.py [event_type] [data]    Run as Claude Code hook
   exercise_tracker.py --list-exercises       List available exercises
+  exercise_tracker.py --pause [timestamp]    Pause until timestamp (default: end of day)
+  exercise_tracker.py --resume               Resume tracking
+  exercise_tracker.py --status               Check pause status
   exercise_tracker.py --help                 Show this help
 
 Event types:
@@ -121,6 +124,104 @@ Environment variables:
 # Quick disable - set VIBEREPS_DISABLED=1 to skip exercise tracking
 if os.getenv("VIBEREPS_DISABLED", ""):
     print('{"status": "skipped", "message": "VIBEREPS_DISABLED is set"}')
+    sys.exit(0)
+
+
+def is_paused() -> bool:
+    """Check if vibereps is paused (paused_until timestamp in config)."""
+    from datetime import datetime
+    config_path = Path.home() / ".vibereps" / "config.json"
+    try:
+        if config_path.exists():
+            config = json.loads(config_path.read_text())
+            paused_until = config.get("paused_until")
+            if paused_until:
+                pause_time = datetime.fromisoformat(paused_until.replace("Z", "+00:00"))
+                # Handle timezone-naive comparison
+                now = datetime.now()
+                if pause_time.tzinfo:
+                    now = datetime.now(pause_time.tzinfo)
+                else:
+                    # Assume local time if no timezone
+                    pass
+                if now < pause_time:
+                    return True
+    except (json.JSONDecodeError, ValueError, OSError):
+        pass
+    return False
+
+
+def set_pause(until_timestamp=None) -> bool:
+    """Set or clear the pause state. If until_timestamp is None, clears pause."""
+    from datetime import datetime
+    config_path = Path.home() / ".vibereps" / "config.json"
+    config_dir = config_path.parent
+
+    try:
+        config_dir.mkdir(exist_ok=True)
+        config = {}
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text())
+            except json.JSONDecodeError:
+                pass
+
+        if until_timestamp:
+            config["paused_until"] = until_timestamp
+        elif "paused_until" in config:
+            del config["paused_until"]
+
+        config_path.write_text(json.dumps(config, indent=2))
+        return True
+    except OSError:
+        return False
+
+
+def get_end_of_day() -> str:
+    """Get ISO timestamp for end of current day (23:59:59 local time)."""
+    from datetime import datetime
+    now = datetime.now()
+    end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=0)
+    return end_of_day.isoformat()
+
+
+# Handle --pause and --resume before anything else
+if len(sys.argv) > 1 and sys.argv[1] == "--pause":
+    # Optional timestamp argument, defaults to end of day
+    if len(sys.argv) > 2:
+        until = sys.argv[2]
+    else:
+        until = get_end_of_day()
+    if set_pause(until):
+        print(f'{{"status": "paused", "until": "{until}"}}')
+    else:
+        print('{"status": "error", "message": "Failed to set pause"}')
+    sys.exit(0)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--resume":
+    if set_pause(None):
+        print('{"status": "resumed"}')
+    else:
+        print('{"status": "error", "message": "Failed to resume"}')
+    sys.exit(0)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--status":
+    from datetime import datetime
+    config_path = Path.home() / ".vibereps" / "config.json"
+    paused = is_paused()
+    paused_until = None
+    try:
+        if config_path.exists():
+            config = json.loads(config_path.read_text())
+            paused_until = config.get("paused_until")
+    except (json.JSONDecodeError, OSError):
+        pass
+    print(json.dumps({"paused": paused, "paused_until": paused_until}))
+    sys.exit(0)
+
+# Check if paused
+if is_paused():
+    print('{"status": "skipped", "message": "VibeReps is paused"}')
     sys.exit(0)
 
 # Configuration - set these environment variables or edit directly

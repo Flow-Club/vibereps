@@ -39,6 +39,62 @@ const mediapipePath = isDev
 const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
 const configPath = path.join(os.homedir(), '.vibereps', 'config.json');
 
+// Check if vibereps is paused
+function isPaused() {
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const pausedUntil = config.paused_until;
+      if (pausedUntil) {
+        const pauseTime = new Date(pausedUntil);
+        if (new Date() < pauseTime) {
+          return { paused: true, until: pausedUntil };
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return { paused: false, until: null };
+}
+
+// Set or clear pause state
+function setPause(untilTimestamp = null) {
+  try {
+    const configDir = path.dirname(configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (e) {
+        // Start fresh if corrupted
+      }
+    }
+
+    if (untilTimestamp) {
+      config.paused_until = untilTimestamp;
+    } else if (config.paused_until) {
+      delete config.paused_until;
+    }
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Failed to set pause:', e);
+    return false;
+  }
+}
+
+// Get end of current day as ISO timestamp
+function getEndOfDay() {
+  const now = new Date();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return endOfDay.toISOString();
+}
+
 // Load/save window bounds to remember position across sessions
 function loadWindowBounds() {
   try {
@@ -440,6 +496,40 @@ function setupHttpServer() {
     // Don't actually shutdown - we're a persistent menubar app
   });
 
+  // API: Get pause status
+  expressApp.get('/api/pause', (req, res) => {
+    const status = isPaused();
+    res.json(status);
+  });
+
+  // API: Pause vibereps
+  expressApp.post('/api/pause', (req, res) => {
+    const { until } = req.body;
+    const untilTimestamp = until || getEndOfDay();
+    if (setPause(untilTimestamp)) {
+      // Refresh menu to show updated state
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
+      res.json({ success: true, paused: true, until: untilTimestamp });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to pause' });
+    }
+  });
+
+  // API: Resume vibereps
+  expressApp.post('/api/resume', (req, res) => {
+    if (setPause(null)) {
+      // Refresh menu to show updated state
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
+      res.json({ success: true, paused: false });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to resume' });
+    }
+  });
+
   // Start server
   httpServer = expressApp.listen(HTTP_PORT, 'localhost', () => {
     console.log(`VibeReps HTTP server running on http://localhost:${HTTP_PORT}`);
@@ -622,6 +712,38 @@ function buildContextMenu() {
     menuItems.push({
       label: '🤖 Claude: No usage data',
       enabled: false
+    });
+  }
+
+  menuItems.push({ type: 'separator' });
+
+  // Pause/Resume toggle
+  const pauseStatus = isPaused();
+  if (pauseStatus.paused) {
+    // Show when paused until
+    const pauseTime = new Date(pauseStatus.until);
+    const isToday = pauseTime.toDateString() === new Date().toDateString();
+    const timeStr = isToday
+      ? pauseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : pauseTime.toLocaleString();
+    menuItems.push({
+      label: `⏸️ Paused until ${timeStr}`,
+      enabled: false
+    });
+    menuItems.push({
+      label: 'Resume VibeReps',
+      click: () => {
+        setPause(null);
+        tray.setContextMenu(buildContextMenu());
+      }
+    });
+  } else {
+    menuItems.push({
+      label: 'Pause Until End of Day',
+      click: () => {
+        setPause(getEndOfDay());
+        tray.setContextMenu(buildContextMenu());
+      }
     });
   }
 

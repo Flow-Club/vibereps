@@ -14,6 +14,7 @@ Exercise tracker for Claude Code. Determine what the user needs based on context
 | "test" / "launch" / "run" | → Test Tracker |
 | "add exercise" / "custom" / "new exercise" | → Add Exercise |
 | "not counting" / "sensitivity" / "threshold" / "tune" | → Tune Detection |
+| "pause" / "disable" / "stop" / "break" | → Pause/Resume |
 | General question | → Overview |
 
 ---
@@ -243,6 +244,61 @@ For angle-based exercises, use `joint_alt` to average both sides:
   "joint": [23, 25, 27],
   "joint_alt": [24, 26, 28]
 }
+```
+
+---
+
+## Pause/Resume
+
+Temporarily disable vibereps until a specified time.
+
+### Pause Until End of Day (default)
+
+```bash
+~/.vibereps/exercise_tracker.py --pause
+```
+
+### Pause Until Specific Time
+
+```bash
+# ISO format timestamp
+~/.vibereps/exercise_tracker.py --pause "2026-01-30T18:00:00"
+```
+
+### Resume
+
+```bash
+~/.vibereps/exercise_tracker.py --resume
+```
+
+### Check Status
+
+```bash
+~/.vibereps/exercise_tracker.py --status
+```
+
+### Via Menubar
+
+If using the VibeReps menubar app, click the tray icon and select:
+- **"Pause Until End of Day"** to pause
+- **"Resume VibeReps"** to resume (shown when paused)
+
+### Via HTTP API (Electron app)
+
+```bash
+# Check pause status
+curl http://localhost:8800/api/pause
+
+# Pause until end of day
+curl -X POST http://localhost:8800/api/pause
+
+# Pause until specific time
+curl -X POST http://localhost:8800/api/pause \
+  -H "Content-Type: application/json" \
+  -d '{"until": "2026-01-30T18:00:00"}'
+
+# Resume
+curl -X POST http://localhost:8800/api/resume
 ```
 
 ---
