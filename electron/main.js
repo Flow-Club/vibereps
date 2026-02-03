@@ -371,8 +371,8 @@ function setupHttpServer() {
         mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
       }
 
-      // Show the window on edit/write activity
-      if (tool_name && ['Edit', 'Write'].includes(tool_name)) {
+      // Show the window on edit/write activity (unless paused)
+      if (tool_name && ['Edit', 'Write'].includes(tool_name) && !isPaused().paused) {
         showWindow();
       }
 
@@ -456,9 +456,11 @@ function setupHttpServer() {
   expressApp.get('/status', (req, res) => {
     const sessions = sessionManager.getAll();
     const hasComplete = sessions.some(s => s.status === 'complete');
+    const pauseStatus = isPaused();
     res.json({
       claude_complete: hasComplete,
-      exercise_complete: false
+      exercise_complete: false,
+      paused: pauseStatus.paused
     });
   });
 
@@ -752,6 +754,7 @@ function buildContextMenu() {
   // Actions
   menuItems.push({
     label: 'Show VibeReps',
+    enabled: !pauseStatus.paused,
     click: () => showWindow()
   });
 
@@ -839,6 +842,22 @@ app.whenReady().then(() => {
   // Create window and tray
   createWindow();
   createTray();
+
+  // Watch config file for changes (e.g., pause via CLI)
+  const configDir = path.dirname(configPath);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+  // Ensure config file exists before watching
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, '{}');
+  }
+  fs.watch(configPath, { persistent: false }, (eventType) => {
+    if (eventType === 'change' && tray) {
+      // Rebuild tray menu when config changes
+      tray.setContextMenu(buildContextMenu());
+    }
+  });
 
   console.log('VibeReps menubar ready');
 });

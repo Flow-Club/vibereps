@@ -1790,6 +1790,16 @@ const selector = document.getElementById('exerciseSelector');
                 const response = await fetch('/status');
                 const status = await response.json();
 
+                if (status.paused) {
+                    // Stop camera and close window when paused
+                    if (camera) {
+                        camera.stop();
+                    }
+                    document.getElementById('status').textContent = '⏸️ VibeReps paused';
+                    window.close();
+                    return;
+                }
+
                 if (status.claude_complete) {
                     // Claude is done! Show completion
                     showClaudeCompleteNotification();
@@ -1844,6 +1854,17 @@ const selector = document.getElementById('exerciseSelector');
                 try {
                     const response = await fetch('/status');
                     const status = await response.json();
+
+                    if (status.paused) {
+                        clearInterval(statusPollInterval);
+                        // Stop camera and close window when paused
+                        if (camera) {
+                            camera.stop();
+                        }
+                        document.getElementById('status').textContent = '⏸️ VibeReps paused';
+                        window.close();
+                        return;
+                    }
 
                     if (status.claude_complete) {
                         clearInterval(statusPollInterval);
@@ -1960,6 +1981,15 @@ const selector = document.getElementById('exerciseSelector');
             const status = document.getElementById('camStatus');
 
             try {
+                // Check if paused before requesting camera
+                const statusResponse = await fetch('/status');
+                const statusData = await statusResponse.json();
+                if (statusData.paused) {
+                    document.getElementById('status').textContent = '⏸️ VibeReps paused';
+                    window.close();
+                    return;
+                }
+
                 // Need to request permission first to get device labels
                 const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 tempStream.getTracks().forEach(track => track.stop());

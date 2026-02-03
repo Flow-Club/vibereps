@@ -663,7 +663,8 @@ class ExerciseHTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             status = {
                 "claude_complete": ExerciseHTTPHandler.claude_complete,
-                "exercise_complete": ExerciseHTTPHandler.exercise_complete
+                "exercise_complete": ExerciseHTTPHandler.exercise_complete,
+                "paused": is_paused()
             }
             self.wfile.write(json.dumps(status).encode())
         elif parsed_path == '/exercises':
@@ -1076,6 +1077,11 @@ class ExerciseTrackerHook:
                 # Check if shutdown was requested via /shutdown endpoint
                 if self.shutdown_requested:
                     print("🛑 Shutdown requested")
+                    break
+
+                # Check if user paused vibereps while daemon was running
+                if is_paused():
+                    print("⏸️ VibeReps paused")
                     break
 
                 # Check if browser window was closed (Chrome process gone)
