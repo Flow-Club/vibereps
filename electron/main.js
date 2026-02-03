@@ -39,6 +39,62 @@ const mediapipePath = isDev
 const exerciseLogPath = path.join(os.homedir(), '.vibereps', 'exercises.jsonl');
 const configPath = path.join(os.homedir(), '.vibereps', 'config.json');
 
+// Check if vibereps is paused
+function isPaused() {
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const pausedUntil = config.paused_until;
+      if (pausedUntil) {
+        const pauseTime = new Date(pausedUntil);
+        if (new Date() < pauseTime) {
+          return { paused: true, until: pausedUntil };
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return { paused: false, until: null };
+}
+
+// Set or clear pause state
+function setPause(untilTimestamp = null) {
+  try {
+    const configDir = path.dirname(configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (e) {
+        // Start fresh if corrupted
+      }
+    }
+
+    if (untilTimestamp) {
+      config.paused_until = untilTimestamp;
+    } else if (config.paused_until) {
+      delete config.paused_until;
+    }
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Failed to set pause:', e);
+    return false;
+  }
+}
+
+// Get end of current day as ISO timestamp
+function getEndOfDay() {
+  const now = new Date();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return endOfDay.toISOString();
+}
+
 // Load/save window bounds to remember position across sessions
 function loadWindowBounds() {
   try {
@@ -315,8 +371,8 @@ function setupHttpServer() {
         mainWindow.webContents.send('sessions-updated', sessionManager.getAll());
       }
 
-      // Show the window on edit/write activity
-      if (tool_name && ['Edit', 'Write'].includes(tool_name)) {
+      // Show the window on edit/write activity (unless paused)
+      if (tool_name && ['Edit', 'Write'].includes(tool_name) && !isPaused().paused) {
         showWindow();
       }
 
@@ -400,9 +456,11 @@ function setupHttpServer() {
   expressApp.get('/status', (req, res) => {
     const sessions = sessionManager.getAll();
     const hasComplete = sessions.some(s => s.status === 'complete');
+    const pauseStatus = isPaused();
     res.json({
       claude_complete: hasComplete,
-      exercise_complete: false
+      exercise_complete: false,
+      paused: pauseStatus.paused
     });
   });
 
@@ -438,6 +496,40 @@ function setupHttpServer() {
   expressApp.post('/shutdown', (req, res) => {
     res.json({ success: true });
     // Don't actually shutdown - we're a persistent menubar app
+  });
+
+  // API: Get pause status
+  expressApp.get('/api/pause', (req, res) => {
+    const status = isPaused();
+    res.json(status);
+  });
+
+  // API: Pause vibereps
+  expressApp.post('/api/pause', (req, res) => {
+    const { until } = req.body;
+    const untilTimestamp = until || getEndOfDay();
+    if (setPause(untilTimestamp)) {
+      // Refresh menu to show updated state
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
+      res.json({ success: true, paused: true, until: untilTimestamp });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to pause' });
+    }
+  });
+
+  // API: Resume vibereps
+  expressApp.post('/api/resume', (req, res) => {
+    if (setPause(null)) {
+      // Refresh menu to show updated state
+      if (tray) {
+        tray.setContextMenu(buildContextMenu());
+      }
+      res.json({ success: true, paused: false });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to resume' });
+    }
   });
 
   // Start server
@@ -627,9 +719,42 @@ function buildContextMenu() {
 
   menuItems.push({ type: 'separator' });
 
+  // Pause/Resume toggle
+  const pauseStatus = isPaused();
+  if (pauseStatus.paused) {
+    // Show when paused until
+    const pauseTime = new Date(pauseStatus.until);
+    const isToday = pauseTime.toDateString() === new Date().toDateString();
+    const timeStr = isToday
+      ? pauseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : pauseTime.toLocaleString();
+    menuItems.push({
+      label: `⏸️ Paused until ${timeStr}`,
+      enabled: false
+    });
+    menuItems.push({
+      label: 'Resume VibeReps',
+      click: () => {
+        setPause(null);
+        tray.setContextMenu(buildContextMenu());
+      }
+    });
+  } else {
+    menuItems.push({
+      label: 'Pause Until End of Day',
+      click: () => {
+        setPause(getEndOfDay());
+        tray.setContextMenu(buildContextMenu());
+      }
+    });
+  }
+
+  menuItems.push({ type: 'separator' });
+
   // Actions
   menuItems.push({
     label: 'Show VibeReps',
+    enabled: !pauseStatus.paused,
     click: () => showWindow()
   });
 
@@ -717,6 +842,22 @@ app.whenReady().then(() => {
   // Create window and tray
   createWindow();
   createTray();
+
+  // Watch config file for changes (e.g., pause via CLI)
+  const configDir = path.dirname(configPath);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+  // Ensure config file exists before watching
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, '{}');
+  }
+  fs.watch(configPath, { persistent: false }, (eventType) => {
+    if (eventType === 'change' && tray) {
+      // Rebuild tray menu when config changes
+      tray.setContextMenu(buildContextMenu());
+    }
+  });
 
   console.log('VibeReps menubar ready');
 });
