@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-04
+
+### Added
+- Pause/resume functionality — temporarily disable vibereps with `--pause` and `--resume`
+- Pause state reflected in both exercise UI and Electron tray menu
+- Installable `/vibereps` skill (consolidated from separate skills)
+- `--webapp` flag for installer to skip Electron prompt
+- Demo video on docs homepage
+
+### Fixed
+- Install script now works correctly when piped from curl
+- Fixed double punctuation in install script output
+- Improved notification reliability and session ID lookup
+
+### Changed
+- Default to recommended options when installer is piped (non-interactive)
+- Skills symlinked to avoid duplication
+- Docs updated: workflow diagram fixes, server marked as in-progress
+
+### Release Artifacts
+- `vibereps.tar.gz` — webapp files for browser-based mode
+- `VibeReps.dmg` — macOS Electron menubar app (Apple Silicon / arm64)
+
 ## [0.3.0] - 2026-01-29
 
 ### Added
