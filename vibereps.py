@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-exercise_tracker.py - Claude Code hook for exercise tracking
+vibereps.py - Claude Code hook for exercise tracking and notifications
 Launches exercise UI when Claude edits code. Keeps you moving until Claude finishes.
+Handles both exercise tracking (PostToolUse/UserPromptSubmit) and notifications (Notification).
 """
 
 import sys
@@ -13,6 +14,7 @@ import threading
 import os
 from pathlib import Path
 import subprocess
+import hashlib
 import urllib.request
 import urllib.error
 
@@ -100,17 +102,19 @@ if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
     print("""VibeReps Exercise Tracker
 
 Usage:
-  exercise_tracker.py [event_type] [data]    Run as Claude Code hook
-  exercise_tracker.py --list-exercises       List available exercises
-  exercise_tracker.py --pause [timestamp]    Pause until timestamp (default: end of day)
-  exercise_tracker.py --resume               Resume tracking
-  exercise_tracker.py --status               Check pause status
-  exercise_tracker.py --help                 Show this help
+  vibereps.py [event_type] [data]    Run as Claude Code hook
+  vibereps.py                        Read event type from stdin JSON
+  vibereps.py --list-exercises       List available exercises
+  vibereps.py --pause [timestamp]    Pause until timestamp (default: end of day)
+  vibereps.py --resume               Resume tracking
+  vibereps.py --status               Check pause status
+  vibereps.py --help                 Show this help
 
-Event types:
-  post_tool_use     Quick mode (5 reps while Claude works)
-  user_prompt_submit Quick mode (5 reps while Claude works)
-  task_complete     Normal mode (10 reps after Claude finishes)
+Event types (via argv or stdin hook_event_name):
+  post_tool_use      Quick mode (5 reps while Claude works)
+  user_prompt_submit  Quick mode (5 reps while Claude works)
+  task_complete      Normal mode (10 reps after Claude finishes)
+  notification       Notify exercise tracker that Claude is done
 
 Environment variables:
   VIBEREPS_EXERCISES     Comma-separated list of exercises to use
@@ -988,8 +992,6 @@ class ExerciseTrackerHook:
     def _get_session_id(self, hook_data):
         """Generate a session ID from hook data (uses cwd as identifier)"""
         if hook_data and hook_data.get("cwd"):
-            # Use cwd as session ID - different Claude instances have different working dirs
-            import hashlib
             return hashlib.md5(hook_data["cwd"].encode()).hexdigest()[:12]
         # Fallback to default
         return "default"
@@ -1007,7 +1009,7 @@ class ExerciseTrackerHook:
         return None
 
     def write_port_file(self):
-        """Write current port to discovery file for notify_complete.py"""
+        """Write current port to discovery file for notification handler"""
         try:
             PORT_FILE.write_text(str(self.port))
         except Exception:
@@ -1099,8 +1101,116 @@ class ExerciseTrackerHook:
             if self.server:
                 self.server.shutdown()
 
+    def _get_session_id_file(self, cwd=None):
+        """Get the per-terminal session ID file path."""
+        cwd_hash = ""
+        if cwd:
+            cwd_hash = f"-{hashlib.md5(cwd.encode()).hexdigest()[:8]}"
+        return Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
+
+    def _get_electron_session_id(self, cwd=None):
+        """Get the current Electron session ID if available."""
+        session_id_file = self._get_session_id_file(cwd)
+        if session_id_file.exists():
+            try:
+                return session_id_file.read_text().strip()
+            except OSError:
+                pass
+        return None
+
+    def _notify_electron_app(self, hook_data):
+        """Send notification to Electron menubar app."""
+        url = f"http://localhost:{ELECTRON_PORT}/api/notify"
+        cwd = hook_data.get("cwd") if hook_data else None
+        payload = {"session_id": self._get_electron_session_id(cwd)}
+        if hook_data:
+            payload["message"] = hook_data.get("message", "Claude finished!")
+            payload["notification_type"] = hook_data.get("notification_type", "")
+
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=2) as response:
+                result = json.loads(response.read().decode())
+                return {"status": "success", "message": "Electron app notified", "result": result}
+        except (urllib.error.URLError, OSError) as e:
+            return {"status": "error", "message": f"Failed to notify Electron app: {e}"}
+
+    def _discover_tracker_port(self):
+        """Find the port the exercise tracker is running on."""
+        # Try port file first (fast path)
+        if PORT_FILE.exists():
+            try:
+                port = int(PORT_FILE.read_text().strip())
+                urllib.request.urlopen(f"http://localhost:{port}/status", timeout=0.5)
+                return port
+            except (ValueError, urllib.error.URLError, OSError):
+                pass
+        # Scan port range (slower fallback)
+        for port in PORT_RANGE:
+            try:
+                urllib.request.urlopen(f"http://localhost:{port}/status", timeout=0.3)
+                return port
+            except (urllib.error.URLError, OSError):
+                continue
+        return None
+
+    def _notify_exercise_tracker(self, hook_data, max_retries=3):
+        """Send notification to exercise tracker webapp that Claude is done."""
+        port = self._discover_tracker_port()
+        if not port:
+            return {"status": "skipped", "message": "Exercise tracker not running"}
+
+        url = f"http://localhost:{port}/notify"
+        payload = {}
+        if hook_data:
+            payload["message"] = hook_data.get("message", "")
+            payload["notification_type"] = hook_data.get("notification_type", "")
+
+        for attempt in range(max_retries):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=2) as response:
+                    result = json.loads(response.read().decode())
+                    return {"status": "success", "message": "Exercise tracker notified", "result": result}
+            except urllib.error.URLError as e:
+                if "Connection refused" in str(e):
+                    return {"status": "skipped", "message": "Exercise tracker not running"}
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return {"status": "error", "message": f"Notification failed after {max_retries} attempts: {e}"}
+            except Exception as e:
+                return {"status": "error", "message": f"Notification failed: {e}"}
+        return {"status": "error", "message": "Notification failed"}
+
+    def handle_notification(self, hook_data):
+        """Handle Notification hook event — notify exercise UI that Claude is done."""
+        # Set terminal tab title
+        sys.stderr.write('\033]0;vibereps: done\007')
+        sys.stderr.flush()
+
+        # First try Electron menubar app
+        if is_electron_app_running():
+            return self._notify_electron_app(hook_data)
+
+        # Fall back to browser-based tracker
+        return self._notify_exercise_tracker(hook_data)
+
     def handle_hook(self, event_type, data):
         """Main hook handler"""
+        if event_type == "notification":
+            return self.handle_notification(data)
+
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
             # For user_prompt_submit, check if the prompt is likely to result in edits
             if event_type == "user_prompt_submit":
@@ -1115,6 +1225,10 @@ class ExerciseTrackerHook:
                 if not prompt_likely_to_edit(prompt):
                     return {"status": "skipped", "message": "Prompt doesn't look like it will result in edits"}
 
+            # Set terminal tab title
+            sys.stderr.write('\033]0;vibereps: exercising\007')
+            sys.stderr.flush()
+
             # First, check if Electron menubar app is running or can be launched
             electron_running = is_electron_app_running()
 
@@ -1128,7 +1242,6 @@ class ExerciseTrackerHook:
                 # Include cwd hash to differentiate multiple Claude instances in same parent
                 cwd_hash = ""
                 if data and data.get("cwd"):
-                    import hashlib
                     cwd_hash = f"-{hashlib.md5(data['cwd'].encode()).hexdigest()[:8]}"
                 session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
                 if session_id_file.exists():
@@ -1318,19 +1431,31 @@ def main():
         tracker.run_server_daemon(quick_mode=True)
         return 0
 
-    # Parse Claude Code hook event
-    if len(sys.argv) > 1:
-        event_type = sys.argv[1]
-        # Command line arg is usually '{}', real data comes from stdin
-        _ = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
-    else:
-        # Test mode
-        event_type = "post_tool_use"
-
-    # Read actual hook payload from stdin (Claude Code passes it there)
+    # Read hook payload from stdin FIRST (Claude Code passes data there)
     hook_data = read_hook_payload_from_stdin()
 
-    # Initialize tracker first (needed for session ID generation)
+    # Determine event type: prefer stdin hook_event_name, fall back to argv
+    event_type = None
+    if hook_data:
+        raw = hook_data.get("hook_event_name", "")
+        if raw:
+            event_name_map = {
+                "posttooluse": "post_tool_use",
+                "userpromptsubmit": "user_prompt_submit",
+                "taskcomplete": "task_complete",
+                "notification": "notification",
+                "stop": "stop",
+            }
+            event_type = event_name_map.get(raw.lower(), raw.lower().replace(" ", "_"))
+
+    if not event_type and len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        event_type = sys.argv[1]
+
+    if not event_type:
+        # No event type from stdin or argv — default to post_tool_use for test mode
+        event_type = "post_tool_use"
+
+    # Initialize tracker
     tracker = ExerciseTrackerHook()
 
     # Build context from hook payload + transcript
@@ -1347,7 +1472,7 @@ def main():
     result = tracker.handle_hook(event_type, hook_data)
 
     print(json.dumps(result))
-    return 0 if result["status"] == "success" else 1
+    return 0 if result["status"] in ("success", "skipped") else 1
 
 
 if __name__ == "__main__":

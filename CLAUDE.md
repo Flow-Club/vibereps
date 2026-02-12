@@ -8,8 +8,8 @@ This is an exercise tracking system for Claude Code that encourages movement bre
 
 **Local Components:**
 
-- **Exercise Tracker Hook** (`exercise_tracker.py` + `exercise_ui.html`) - Launches exercise UI when you submit prompts or complete tasks
-- **Notification Hook** (`notify_complete.py`) - Notifies you when Claude finishes while you're exercising
+- **Exercise Tracker Hook** (`vibereps.py` + `exercise_ui.html`) - Launches exercise UI when you submit prompts or complete tasks
+- **Notification Hook** (also `vibereps.py`) - Notifies you when Claude finishes while you're exercising
 
 **Remote Server** (`server/`):
 
@@ -24,7 +24,7 @@ All pose detection uses MediaPipe via browser webcam to count reps (squats, push
 ```
 Local                                              Remote Server (optional)
 ─────                                              ─────────────────────────
-exercise_tracker.py ──┬── ~/.vibereps/exercises.jsonl (local log)
+vibereps.py ──────────┬── ~/.vibereps/exercises.jsonl (local log)
 exercise_ui.html      │
                       └── POST /api/log ──────────▶ FastAPI (server/main.py)
                                                     ├── REST API (for hook)
@@ -40,7 +40,7 @@ Claude Code ────────MCP over HTTP──────────�
                                                     └── log_exercise_session
 ```
 
-### Local Hook (`exercise_tracker.py` + `exercise_ui.html`)
+### Local Hook (`vibereps.py` + `exercise_ui.html`)
 
 - Launches a local HTTP server (port 8765) serving the UI from `exercise_ui.html`
 - Supports two modes:
@@ -50,9 +50,10 @@ Claude Code ────────MCP over HTTP──────────�
 - The HTML file contains all UI logic and MediaPipe integration (loaded from CDN)
 - Exercise detection happens entirely client-side using pose landmark angles
 
-### Notification System (`notify_complete.py`)
+### Notification System (integrated in `vibereps.py`)
 
 - Triggered by `Notification` hook when Claude finishes a task
+- `vibereps.py` reads the event type from stdin and routes to notification handler
 - Sends HTTP POST to `http://localhost:8765/notify` to signal completion
 - Exercise tracker UI polls `/status` endpoint to detect when Claude is ready
 - Shows desktop notification and updates UI when complete
@@ -157,11 +158,11 @@ Exercise configs are defined in `exercises/` JSON files. Each config specifies:
 **PostToolUse Mode (recommended):**
 
 1. Claude edits code → `PostToolUse` hook triggers (matcher: `Write|Edit`)
-2. `exercise_tracker.py` launches with `?quick=true` parameter
+2. `vibereps.py` launches with `?quick=true` parameter
 3. User does quick exercises while reviewing changes
 4. Exercise complete → Hook POSTs to remote server
 5. Claude finishes task → `Notification` hook triggers
-6. `notify_complete.py` POSTs to `/notify` endpoint
+6. `vibereps.py` (notification handler) POSTs to `/notify` endpoint
 7. UI detects completion, shows notification, user returns to Claude
 
 **Normal Mode:**
@@ -202,16 +203,16 @@ export VIBEREPS_API_URL=http://localhost:8000
 export VIBEREPS_API_KEY=your_api_key_here
 
 # Test the exercise tracker
-./exercise_tracker.py user_prompt_submit '{}'
+./vibereps.py post_tool_use '{}'
 
 # In another terminal, test the notification
-./notify_complete.py '{}'
+echo '{"hook_event_name":"Notification"}' | ./vibereps.py
 ```
 
 ### Test Local Hook (Normal Mode)
 
 ```bash
-./exercise_tracker.py task_complete '{}'
+./vibereps.py task_complete '{}'
 ```
 
 ### Test MCP Endpoint
@@ -255,16 +256,16 @@ Temporarily disable vibereps until a specified time:
 
 ```bash
 # Pause until end of day (default)
-./exercise_tracker.py --pause
+./vibereps.py --pause
 
 # Pause until specific time
-./exercise_tracker.py --pause "2026-01-30T18:00:00"
+./vibereps.py --pause "2026-01-30T18:00:00"
 
 # Resume tracking
-./exercise_tracker.py --resume
+./vibereps.py --resume
 
 # Check status
-./exercise_tracker.py --status
+./vibereps.py --status
 ```
 
 Pause state is stored in `~/.vibereps/config.json` as `paused_until` timestamp.
@@ -284,7 +285,7 @@ Exercise after code edits! Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /path/to/exercise_tracker.py post_tool_use '{}'",
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,calf_raises /path/to/vibereps.py",
             "async": true
           }
         ]
@@ -296,7 +297,7 @@ Exercise after code edits! Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/notify_complete.py '{}'",
+            "command": "/path/to/vibereps.py",
             "async": true
           }
         ]
@@ -349,7 +350,7 @@ Modify angle thresholds in `detectSquat`, `detectPushup`, `detectJumpingJack` fu
 
 ### Change Server Port
 
-Edit `self.port = 8765` in `ExerciseTrackerHook.__init__` in `exercise_tracker.py`.
+Edit `self.port = 8765` in `ExerciseTrackerHook.__init__` in `vibereps.py`.
 
 ### Adjust Goals
 

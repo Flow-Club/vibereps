@@ -74,7 +74,7 @@ Use AskUserQuestion with MultiSelect: true. Show exercises based on mode:
 ### Step 4: Find Install Location
 
 ```bash
-if [[ -f "$HOME/.vibereps/exercise_tracker.py" ]]; then
+if [[ -f "$HOME/.vibereps/vibereps.py" ]]; then
     echo "$HOME/.vibereps"
 else
     echo "$(pwd)"
@@ -92,7 +92,7 @@ Update `~/.claude/settings.json`:
       "matcher": "Write|Edit|MultiEdit",
       "hooks": [{
         "type": "command",
-        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/exercise_tracker.py post_tool_use '{}'",
+        "command": "VIBEREPS_EXERCISES={exercises} {vibereps_dir}/vibereps.py",
         "async": true
       }]
     }],
@@ -100,7 +100,7 @@ Update `~/.claude/settings.json`:
       "matcher": "idle_prompt|permission_prompt",
       "hooks": [{
         "type": "command",
-        "command": "{vibereps_dir}/notify_complete.py '{}'",
+        "command": "{vibereps_dir}/vibereps.py",
         "async": true
       }]
     }]
@@ -127,24 +127,24 @@ How it works:
 
 **Launch in quick mode** (exercises while Claude works):
 ```bash
-pkill -f "exercise_tracker.py" 2>/dev/null
-~/.vibereps/exercise_tracker.py user_prompt_submit '{}'
+pkill -f "vibereps.py" 2>/dev/null
+~/.vibereps/vibereps.py user_prompt_submit '{}'
 ```
 
 **Launch in normal mode** (after task complete):
 ```bash
-pkill -f "exercise_tracker.py" 2>/dev/null
-~/.vibereps/exercise_tracker.py task_complete '{}'
+pkill -f "vibereps.py" 2>/dev/null
+~/.vibereps/vibereps.py task_complete '{}'
 ```
 
 **With specific exercises:**
 ```bash
-VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/exercise_tracker.py user_prompt_submit '{}'
+VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/vibereps.py user_prompt_submit '{}'
 ```
 
 **Kill tracker:**
 ```bash
-pkill -f "exercise_tracker.py"
+pkill -f "vibereps.py"
 ```
 
 **Check if running:**
@@ -206,7 +206,7 @@ Create `exercises/{exercise_name}.json`:
 ### 4. Test
 
 ```bash
-~/.vibereps/exercise_tracker.py user_prompt_submit '{}'
+~/.vibereps/vibereps.py user_prompt_submit '{}'
 ```
 
 ---
@@ -232,7 +232,7 @@ Create `exercises/{exercise_name}.json`:
 ### Testing Changes
 
 1. Edit threshold in JSON
-2. Restart tracker: `~/.vibereps/exercise_tracker.py user_prompt_submit '{}'`
+2. Restart tracker: `~/.vibereps/vibereps.py user_prompt_submit '{}'`
 3. Watch status text for live angle/distance values
 4. Adjust based on state transitions
 
@@ -255,26 +255,26 @@ Temporarily disable vibereps until a specified time.
 ### Pause Until End of Day (default)
 
 ```bash
-~/.vibereps/exercise_tracker.py --pause
+~/.vibereps/vibereps.py --pause
 ```
 
 ### Pause Until Specific Time
 
 ```bash
 # ISO format timestamp
-~/.vibereps/exercise_tracker.py --pause "2026-01-30T18:00:00"
+~/.vibereps/vibereps.py --pause "2026-01-30T18:00:00"
 ```
 
 ### Resume
 
 ```bash
-~/.vibereps/exercise_tracker.py --resume
+~/.vibereps/vibereps.py --resume
 ```
 
 ### Check Status
 
 ```bash
-~/.vibereps/exercise_tracker.py --status
+~/.vibereps/vibereps.py --status
 ```
 
 ### Via Menubar

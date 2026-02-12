@@ -98,7 +98,7 @@ configure_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'",
+            "command": "$REPO_DIR/vibereps.py",
             "async": true
           }
         ]
@@ -110,7 +110,7 @@ configure_hooks() {
         "hooks": [
           {
             "type": "command",
-            "command": "$REPO_DIR/notify_complete.py '{}'",
+            "command": "$REPO_DIR/vibereps.py",
             "async": true
           }
         ]
@@ -135,7 +135,7 @@ HOOKS_CONFIGURED=false
 if [ -f "$CLAUDE_SETTINGS" ] && [ "$HAS_JQ" = true ]; then
     if jq -e '.hooks.PostToolUse' "$CLAUDE_SETTINGS" &>/dev/null; then
         # Check if vibereps hooks are configured
-        if jq -e '.hooks.PostToolUse[].hooks[].command | contains("exercise_tracker")' "$CLAUDE_SETTINGS" &>/dev/null; then
+        if jq -e '.hooks.PostToolUse[].hooks[].command | contains("vibereps")' "$CLAUDE_SETTINGS" &>/dev/null; then
             HOOKS_CONFIGURED=true
             echo "   Claude Code hooks already configured!"
         fi
@@ -183,7 +183,7 @@ if [ "$HOOKS_CONFIGURED" = false ] && [ "$HAS_JQ" = false ]; then
       "matcher": "Write|Edit",
       "hooks": [{
         "type": "command",
-        "command": "$REPO_DIR/exercise_tracker.py post_tool_use '{}'",
+        "command": "$REPO_DIR/vibereps.py",
         "async": true
       }]
     }],
@@ -191,7 +191,7 @@ if [ "$HOOKS_CONFIGURED" = false ] && [ "$HAS_JQ" = false ]; then
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "$REPO_DIR/notify_complete.py '{}'",
+        "command": "$REPO_DIR/vibereps.py",
         "async": true
       }]
     }]

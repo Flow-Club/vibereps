@@ -17,16 +17,16 @@ Thanks for your interest in contributing! Here's how to get started.
 
 3. Test the exercise tracker:
    ```bash
-   VIBEREPS_EXERCISES=squats ./exercise_tracker.py post_tool_use '{}'
+   VIBEREPS_EXERCISES=squats ./vibereps.py post_tool_use '{}'
    ```
 
 ## Project Structure
 
 ```
 vibereps/
-├── exercise_tracker.py    # Main hook script
+├── vibereps.py            # Main hook script (exercise tracking + notifications)
 ├── exercise_ui.html       # Browser UI with pose detection
-├── notify_complete.py     # Notification hook
+├── notify_complete.py     # Deprecated wrapper (forwards to vibereps.py)
 ├── exercises/             # Exercise JSON configs
 ├── server/                # Optional remote server
 ├── docs/                  # VitePress documentation site
@@ -52,7 +52,7 @@ vibereps/
 
 3. Test with:
    ```bash
-   VIBEREPS_EXERCISES=my_exercise ./exercise_tracker.py post_tool_use '{}'
+   VIBEREPS_EXERCISES=my_exercise ./vibereps.py post_tool_use '{}'
    ```
 
 ## Code Style

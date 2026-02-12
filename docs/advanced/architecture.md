@@ -15,7 +15,7 @@ Option A: Electron Menubar App
 
 Option B: Web Browser
 ┌─────────────────────────────┐
-│ exercise_tracker.py         │──┬── ~/.vibereps/exercises.jsonl
+│ vibereps.py                 │──┬── ~/.vibereps/exercises.jsonl
 │ (ports 8765-8774)           │  │
 │ └── exercise_ui.html        │  └── POST /api/log ──▶ FastAPI
 └─────────────────────────────┘
@@ -45,7 +45,7 @@ Native macOS app with:
 
 Session states: `active` → `waiting_exercise` → `exercising` → `complete`
 
-### Exercise Tracker (`exercise_tracker.py`)
+### Exercise Tracker (`vibereps.py`)
 
 A Python script that:
 1. Launches a local HTTP server on ports 8765-8774
@@ -70,12 +70,13 @@ A self-contained HTML file with:
 
 **No build step required** - everything is in one file.
 
-### Notification Hook (`notify_complete.py`)
+### Notification Handler (integrated in `vibereps.py`)
 
 Signals the exercise UI when Claude finishes:
-1. POSTs to `http://localhost:8765/notify`
-2. Exercise UI polls `/status` endpoint
-3. Shows desktop notification when complete
+1. `vibereps.py` reads `Notification` event from stdin
+2. POSTs to `http://localhost:8765/notify`
+3. Exercise UI polls `/status` endpoint
+4. Shows desktop notification when complete
 
 ## Data Flow
 
@@ -86,7 +87,7 @@ Signals the exercise UI when Claude finishes:
    ↓
 2. PostToolUse hook triggers
    ↓
-3. exercise_tracker.py launches with ?quick=true
+3. vibereps.py launches with ?quick=true
    ↓
 4. User does quick exercises
    ↓
@@ -94,7 +95,7 @@ Signals the exercise UI when Claude finishes:
    ↓
 6. Claude finishes task → Notification hook triggers
    ↓
-7. notify_complete.py POSTs to /notify
+7. vibereps.py (notification handler) POSTs to /notify
    ↓
 8. UI shows notification, user returns to Claude
 ```

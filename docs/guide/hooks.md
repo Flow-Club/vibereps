@@ -30,7 +30,7 @@ The installer adds these hooks to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches ~/.vibereps/exercise_tracker.py post_tool_use '{}'",
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches ~/.vibereps/vibereps.py",
             "async": true
           }
         ]
@@ -42,7 +42,7 @@ The installer adds these hooks to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/notify_complete.py '{}'",
+            "command": "~/.vibereps/vibereps.py",
             "async": true
           }
         ]
@@ -89,7 +89,7 @@ Triggers when you submit a prompt, but uses smart detection to filter out questi
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/exercise_tracker.py user_prompt_submit '{}'",
+            "command": "~/.vibereps/vibereps.py",
             "async": true
           }
         ]
@@ -136,7 +136,7 @@ Triggers when Claude sends a notification (task complete, waiting for input):
         "hooks": [
           {
             "type": "command",
-            "command": "~/.vibereps/notify_complete.py '{}'",
+            "command": "~/.vibereps/vibereps.py",
             "async": true
           }
         ]
