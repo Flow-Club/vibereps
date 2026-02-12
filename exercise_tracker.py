@@ -1289,7 +1289,7 @@ def read_hook_payload_from_stdin() -> dict:
     import select
 
     # Check if there's data on stdin (non-blocking)
-    if select.select([sys.stdin], [], [], 0.1)[0]:
+    if select.select([sys.stdin], [], [], 0.5)[0]:
         try:
             return json.load(sys.stdin)
         except (json.JSONDecodeError, ValueError):
