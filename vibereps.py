@@ -107,6 +107,7 @@ Usage:
   vibereps.py --list-exercises       List available exercises
   vibereps.py --pause [timestamp]    Pause until timestamp (default: end of day)
   vibereps.py --resume               Resume tracking
+  vibereps.py --toggle               Toggle pause on/off
   vibereps.py --status               Check pause status
   vibereps.py --help                 Show this help
 
@@ -189,7 +190,7 @@ def get_end_of_day() -> str:
     return end_of_day.isoformat()
 
 
-# Handle --pause and --resume before anything else
+# Handle --pause, --resume, --toggle, --status before anything else
 if len(sys.argv) > 1 and sys.argv[1] == "--pause":
     # Optional timestamp argument, defaults to end of day
     if len(sys.argv) > 2:
@@ -197,16 +198,30 @@ if len(sys.argv) > 1 and sys.argv[1] == "--pause":
     else:
         until = get_end_of_day()
     if set_pause(until):
-        print(f'{{"status": "paused", "until": "{until}"}}')
+        print(f"vibereps: paused until {until}")
     else:
-        print('{"status": "error", "message": "Failed to set pause"}')
+        print("vibereps: error setting pause", file=sys.stderr)
     sys.exit(0)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--resume":
     if set_pause(None):
-        print('{"status": "resumed"}')
+        print("vibereps: resumed")
     else:
-        print('{"status": "error", "message": "Failed to resume"}')
+        print("vibereps: error resuming", file=sys.stderr)
+    sys.exit(0)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
+    if is_paused():
+        if set_pause(None):
+            print("vibereps: resumed")
+        else:
+            print("vibereps: error resuming", file=sys.stderr)
+    else:
+        until = get_end_of_day()
+        if set_pause(until):
+            print(f"vibereps: paused until {until}")
+        else:
+            print("vibereps: error setting pause", file=sys.stderr)
     sys.exit(0)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--status":
@@ -220,7 +235,13 @@ if len(sys.argv) > 1 and sys.argv[1] == "--status":
             paused_until = config.get("paused_until")
     except (json.JSONDecodeError, OSError):
         pass
-    print(json.dumps({"paused": paused, "paused_until": paused_until}))
+    if paused:
+        msg = "vibereps: paused"
+        if paused_until:
+            msg += f" until {paused_until}"
+        print(msg)
+    else:
+        print("vibereps: active")
     sys.exit(0)
 
 # Check if paused
