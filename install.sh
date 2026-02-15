@@ -5,7 +5,7 @@
 # One-liner install: curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash
 #
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -33,7 +33,7 @@ TRIGGER_MODE="${VIBEREPS_TRIGGER_MODE:-}"
 
 # Check if we're running from an existing clone/dev install
 detect_local_install() {
-    if [[ -f "$(dirname "${BASH_SOURCE[0]}")/exercise_tracker.py" ]]; then
+    if [[ -f "$(dirname "${BASH_SOURCE[0]}")/vibereps.py" ]]; then
         INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         return 0
     fi
@@ -270,9 +270,21 @@ install_vibereps() {
 # Make scripts executable
 setup_permissions() {
     print_step "Setting up permissions"
-    chmod +x "$INSTALL_DIR/exercise_tracker.py"
-    chmod +x "$INSTALL_DIR/notify_complete.py"
+    chmod +x "$INSTALL_DIR/vibereps.py"
+    chmod +x "$INSTALL_DIR/notify_complete.py"  # Deprecated wrapper
     print_success "Scripts are executable"
+
+    # Install shell completions
+    if [[ -f "$INSTALL_DIR/completions.bash" ]]; then
+        print_step "Installing shell completions"
+        # Symlink to /usr/local/bin for PATH access
+        if [[ -d "/usr/local/bin" ]]; then
+            ln -sf "$INSTALL_DIR/vibereps.py" /usr/local/bin/vibereps 2>/dev/null && \
+                print_success "Symlinked 'vibereps' command to /usr/local/bin"
+        fi
+        # Source completions hint
+        print_success "Shell completions available: source $INSTALL_DIR/completions.bash"
+    fi
 }
 
 # Backup existing settings
@@ -315,6 +327,19 @@ else:
 if "hooks" not in settings:
     settings["hooks"] = {}
 
+# Check if guard.sh exists (hook toggle system)
+guard_sh = Path(os.path.expanduser("~/.claude/hooks/guard.sh"))
+has_guard = guard_sh.exists()
+
+def cmd(hook_name, inner_cmd):
+    """Wrap command with guard.sh if available for hook toggling support."""
+    if has_guard:
+        return f"{guard_sh} {hook_name} {inner_cmd}"
+    return inner_cmd
+
+exercise_cmd = cmd("vibereps", f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/vibereps.py")
+notify_cmd = cmd("vibereps", f"{install_dir}/vibereps.py")
+
 # Define the vibereps hooks
 vibereps_hooks = {
     "PostToolUse": [
@@ -323,7 +348,7 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py post_tool_use '{{}}'",
+                    "command": exercise_cmd,
                     "async": True
                 }
             ]
@@ -335,7 +360,7 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"{install_dir}/notify_complete.py '{{}}'",
+                    "command": notify_cmd,
                     "async": True
                 }
             ]
@@ -351,7 +376,7 @@ if trigger_mode == "prompt":
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/exercise_tracker.py user_prompt_submit '{{}}'",
+                    "command": exercise_cmd,
                     "async": True
                 }
             ]
@@ -365,12 +390,14 @@ for hook_type, hook_configs in vibereps_hooks.items():
 
     # Filter out old vibereps hooks
     def is_vibereps_hook(h):
+        s = str(h)
         if isinstance(h, dict):
-            if "exercise_tracker.py" in str(h) or "notify_complete.py" in str(h):
+            if any(name in s for name in ["exercise_tracker.py", "notify_complete.py", "vibereps.py"]):
                 return True
             if "hooks" in h:
                 for nested in h["hooks"]:
-                    if isinstance(nested, dict) and ("exercise_tracker.py" in str(nested) or "notify_complete.py" in str(nested)):
+                    ns = str(nested)
+                    if isinstance(nested, dict) and any(name in ns for name in ["exercise_tracker.py", "notify_complete.py", "vibereps.py"]):
                         return True
         return False
 
@@ -484,11 +511,9 @@ if settings_file.exists():
             # Filter out vibereps hooks
             settings["hooks"][hook_type] = [
                 h for h in settings["hooks"][hook_type]
-                if not (
-                    ("exercise_tracker.py" in str(h)) or
-                    ("notify_complete.py" in str(h)) or
-                    ("vibereps" in str(h).lower())
-                )
+                if not any(name in str(h) for name in [
+                    "exercise_tracker.py", "notify_complete.py", "vibereps.py"
+                ])
             ]
             # Remove empty hook types
             if not settings["hooks"][hook_type]:

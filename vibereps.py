@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-exercise_tracker.py - Claude Code hook for exercise tracking
+vibereps.py - Claude Code hook for exercise tracking and notifications
 Launches exercise UI when Claude edits code. Keeps you moving until Claude finishes.
+Handles both exercise tracking (PostToolUse/UserPromptSubmit) and notifications (Notification).
 """
 
 import sys
@@ -13,6 +14,7 @@ import threading
 import os
 from pathlib import Path
 import subprocess
+import hashlib
 import urllib.request
 import urllib.error
 
@@ -100,17 +102,28 @@ if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
     print("""VibeReps Exercise Tracker
 
 Usage:
-  exercise_tracker.py [event_type] [data]    Run as Claude Code hook
-  exercise_tracker.py --list-exercises       List available exercises
-  exercise_tracker.py --pause [timestamp]    Pause until timestamp (default: end of day)
-  exercise_tracker.py --resume               Resume tracking
-  exercise_tracker.py --status               Check pause status
-  exercise_tracker.py --help                 Show this help
+  vibereps.py [event_type] [data]    Run as Claude Code hook
+  vibereps.py                        Read event type from stdin JSON
+  vibereps.py --list-exercises       List available exercises
+  vibereps.py --pause [timestamp]    Pause until timestamp (default: end of day)
+  vibereps.py --resume               Resume tracking
+  vibereps.py --toggle               Toggle pause on/off
+  vibereps.py --status               Check pause status
+  vibereps.py --help                 Show this help
 
-Event types:
-  post_tool_use     Quick mode (5 reps while Claude works)
-  user_prompt_submit Quick mode (5 reps while Claude works)
-  task_complete     Normal mode (10 reps after Claude finishes)
+Event types (via argv or stdin hook_event_name):
+  post_tool_use      Quick mode (5 reps while Claude works)
+  user_prompt_submit  Quick mode (5 reps while Claude works)
+  task_complete      Normal mode (10 reps after Claude finishes)
+  notification       Notify exercise tracker that Claude is done
+  session_start      Record session start (for replay suppression)
+
+Reliability features:
+  - Agent/delegate sessions are automatically skipped
+  - Events within 3s of session start are suppressed (replay protection)
+  - Rapid notifications are debounced (5s window)
+  - Pause check skips notifications so mid-exercise alerts still work
+  - PID tracking for reliable daemon cleanup
 
 Environment variables:
   VIBEREPS_EXERCISES     Comma-separated list of exercises to use
@@ -185,7 +198,7 @@ def get_end_of_day() -> str:
     return end_of_day.isoformat()
 
 
-# Handle --pause and --resume before anything else
+# Handle --pause, --resume, --toggle, --status before anything else
 if len(sys.argv) > 1 and sys.argv[1] == "--pause":
     # Optional timestamp argument, defaults to end of day
     if len(sys.argv) > 2:
@@ -193,16 +206,30 @@ if len(sys.argv) > 1 and sys.argv[1] == "--pause":
     else:
         until = get_end_of_day()
     if set_pause(until):
-        print(f'{{"status": "paused", "until": "{until}"}}')
+        print(f"vibereps: paused until {until}")
     else:
-        print('{"status": "error", "message": "Failed to set pause"}')
+        print("vibereps: error setting pause", file=sys.stderr)
     sys.exit(0)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--resume":
     if set_pause(None):
-        print('{"status": "resumed"}')
+        print("vibereps: resumed")
     else:
-        print('{"status": "error", "message": "Failed to resume"}')
+        print("vibereps: error resuming", file=sys.stderr)
+    sys.exit(0)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
+    if is_paused():
+        if set_pause(None):
+            print("vibereps: resumed")
+        else:
+            print("vibereps: error resuming", file=sys.stderr)
+    else:
+        until = get_end_of_day()
+        if set_pause(until):
+            print(f"vibereps: paused until {until}")
+        else:
+            print("vibereps: error setting pause", file=sys.stderr)
     sys.exit(0)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--status":
@@ -216,13 +243,16 @@ if len(sys.argv) > 1 and sys.argv[1] == "--status":
             paused_until = config.get("paused_until")
     except (json.JSONDecodeError, OSError):
         pass
-    print(json.dumps({"paused": paused, "paused_until": paused_until}))
+    if paused:
+        msg = "vibereps: paused"
+        if paused_until:
+            msg += f" until {paused_until}"
+        print(msg)
+    else:
+        print("vibereps: active")
     sys.exit(0)
 
-# Check if paused
-if is_paused():
-    print('{"status": "skipped", "message": "VibeReps is paused"}')
-    sys.exit(0)
+# Note: pause check moved into main() so notifications aren't blocked while exercising
 
 # Configuration - set these environment variables or edit directly
 VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
@@ -232,6 +262,214 @@ VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY
 
 # Exercises that require legs (filtered out when VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY=1)
 LEG_EXERCISES = {"squats", "calf_raises", "high_knees", "jumping_jacks"}
+
+# State file for tracking session starts, debounce, etc.
+VIBEREPS_STATE_FILE = Path.home() / ".vibereps" / ".state.json"
+VIBEREPS_PID_FILE = Path("/tmp/vibereps-daemon.pid")
+
+# Suppression windows (seconds)
+SESSION_REPLAY_WINDOW = 3  # Suppress events within 3s of session start
+NOTIFICATION_DEBOUNCE_WINDOW = 5  # Debounce rapid notifications
+
+
+def _load_state() -> dict:
+    """Load persistent state from ~/.vibereps/.state.json"""
+    try:
+        if VIBEREPS_STATE_FILE.exists():
+            return json.loads(VIBEREPS_STATE_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {}
+
+
+def _save_state(state: dict):
+    """Save persistent state to ~/.vibereps/.state.json"""
+    try:
+        VIBEREPS_STATE_FILE.parent.mkdir(exist_ok=True)
+        VIBEREPS_STATE_FILE.write_text(json.dumps(state, indent=2))
+    except OSError:
+        pass
+
+
+def is_agent_session(hook_data: dict) -> bool:
+    """Detect if this is an agent/delegate session (e.g., team sub-agents).
+    Skip exercise triggers for these — only humans need exercise breaks."""
+    if not hook_data:
+        return False
+    # Check for delegate permission mode (team agents)
+    if hook_data.get("permission_mode") == "delegate":
+        return True
+    # Check for session metadata indicating agent/sub-agent
+    session = hook_data.get("session", {})
+    if isinstance(session, dict) and session.get("is_agent"):
+        return True
+    return False
+
+
+def is_session_replay(hook_data: dict) -> bool:
+    """Suppress events within SESSION_REPLAY_WINDOW seconds of session start.
+    When resuming a conversation, Claude Code can fire PostToolUse events
+    for tools that already ran. This prevents ghost exercise triggers."""
+    state = _load_state()
+    session_starts = state.get("session_start_times", {})
+
+    # Determine session key from cwd
+    cwd = hook_data.get("cwd", "") if hook_data else ""
+    session_key = hashlib.md5(cwd.encode()).hexdigest()[:12] if cwd else "default"
+
+    start_time = session_starts.get(session_key, 0)
+    return (time.time() - start_time) < SESSION_REPLAY_WINDOW
+
+
+def record_session_start(hook_data: dict):
+    """Record that a session just started (called on SessionStart event)."""
+    state = _load_state()
+    if "session_start_times" not in state:
+        state["session_start_times"] = {}
+
+    cwd = hook_data.get("cwd", "") if hook_data else ""
+    session_key = hashlib.md5(cwd.encode()).hexdigest()[:12] if cwd else "default"
+    state["session_start_times"][session_key] = time.time()
+
+    # Clean up old entries (> 1 hour)
+    now = time.time()
+    state["session_start_times"] = {
+        k: v for k, v in state["session_start_times"].items()
+        if now - v < 3600
+    }
+    _save_state(state)
+
+
+def should_debounce_notification(hook_data: dict) -> bool:
+    """Debounce rapid notification events within NOTIFICATION_DEBOUNCE_WINDOW seconds."""
+    state = _load_state()
+    last_notify = state.get("last_notification_time", 0)
+    now = time.time()
+
+    if now - last_notify < NOTIFICATION_DEBOUNCE_WINDOW:
+        return True  # Too soon, debounce
+
+    state["last_notification_time"] = now
+    _save_state(state)
+    return False
+
+
+def terminal_is_focused() -> bool:
+    """Check if a terminal app is the frontmost window (macOS only).
+    Returns True if terminal is focused, False otherwise."""
+    import platform
+    if platform.system() != "Darwin":
+        return False  # Can't detect on non-macOS; assume not focused
+
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", 'tell application "System Events" to get name of first application process whose frontmost is true'],
+            capture_output=True, text=True, timeout=1
+        )
+        frontmost = result.stdout.strip().lower()
+        terminal_apps = {"terminal", "iterm2", "iterm", "warp", "alacritty", "kitty", "wezterm", "ghostty"}
+        return frontmost in terminal_apps
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def write_daemon_pid():
+    """Write current process PID to file for reliable cleanup."""
+    try:
+        VIBEREPS_PID_FILE.write_text(str(os.getpid()))
+    except OSError:
+        pass
+
+
+def cleanup_daemon_pid():
+    """Remove PID file on shutdown."""
+    try:
+        if VIBEREPS_PID_FILE.exists():
+            # Only remove if it's our PID
+            stored_pid = VIBEREPS_PID_FILE.read_text().strip()
+            if stored_pid == str(os.getpid()):
+                VIBEREPS_PID_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def check_for_updates():
+    """Check for new version once per day (non-blocking). Shows banner on next session."""
+    update_check_file = Path.home() / ".vibereps" / ".last_update_check"
+    update_available_file = Path.home() / ".vibereps" / ".update_available"
+
+    try:
+        now = time.time()
+        last_check = 0
+        if update_check_file.exists():
+            try:
+                last_check = float(update_check_file.read_text().strip())
+            except (ValueError, OSError):
+                pass
+
+        # Only check once per day (86400 seconds)
+        if now - last_check < 86400:
+            # Show banner if update was previously detected
+            if update_available_file.exists():
+                try:
+                    remote_version = update_available_file.read_text().strip()
+                    sys.stderr.write(f"\033[33mvibereps: update available ({remote_version}). Run: curl -sSL https://raw.githubusercontent.com/Flow-Club/vibereps/main/install.sh | bash\033[0m\n")
+                    sys.stderr.flush()
+                except OSError:
+                    pass
+            return
+
+        # Record check time
+        update_check_file.parent.mkdir(exist_ok=True)
+        update_check_file.write_text(str(now))
+
+        # Read local version
+        version_file = Path(__file__).parent / "VERSION"
+        local_version = ""
+        if version_file.exists():
+            local_version = version_file.read_text().strip()
+
+        if not local_version:
+            return
+
+        # Fetch remote version (non-blocking via subprocess)
+        def _check():
+            try:
+                req = urllib.request.Request(
+                    "https://raw.githubusercontent.com/Flow-Club/vibereps/main/VERSION",
+                    headers={"User-Agent": "vibereps-update-check"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    remote_version = resp.read().decode().strip()
+                    if remote_version and remote_version != local_version:
+                        update_available_file.write_text(remote_version)
+                    elif update_available_file.exists():
+                        update_available_file.unlink(missing_ok=True)
+            except (urllib.error.URLError, OSError):
+                pass
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    except OSError:
+        pass
+
+
+def kill_stale_daemon():
+    """Kill a stale daemon process if PID file exists and process is running."""
+    try:
+        if VIBEREPS_PID_FILE.exists():
+            pid = int(VIBEREPS_PID_FILE.read_text().strip())
+            os.kill(pid, 0)  # Check if alive
+            os.kill(pid, 15)  # SIGTERM
+            VIBEREPS_PID_FILE.unlink(missing_ok=True)
+            return True
+    except (ValueError, ProcessLookupError, PermissionError, OSError):
+        # Process not running or can't be killed — clean up stale file
+        try:
+            VIBEREPS_PID_FILE.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return False
 
 
 def get_filtered_exercises():
@@ -988,8 +1226,6 @@ class ExerciseTrackerHook:
     def _get_session_id(self, hook_data):
         """Generate a session ID from hook data (uses cwd as identifier)"""
         if hook_data and hook_data.get("cwd"):
-            # Use cwd as session ID - different Claude instances have different working dirs
-            import hashlib
             return hashlib.md5(hook_data["cwd"].encode()).hexdigest()[:12]
         # Fallback to default
         return "default"
@@ -1007,7 +1243,7 @@ class ExerciseTrackerHook:
         return None
 
     def write_port_file(self):
-        """Write current port to discovery file for notify_complete.py"""
+        """Write current port to discovery file for notification handler"""
         try:
             PORT_FILE.write_text(str(self.port))
         except Exception:
@@ -1059,6 +1295,7 @@ class ExerciseTrackerHook:
 
     def run_server_daemon(self, quick_mode=True):
         """Run the server in daemon mode (blocking)"""
+        write_daemon_pid()
         self.start_web_server(quick_mode=quick_mode)
 
         # Browser is opened by parent process, not here
@@ -1095,12 +1332,147 @@ class ExerciseTrackerHook:
                 time.sleep(1)
         finally:
             # Always clean up
+            cleanup_daemon_pid()
             self.cleanup_port_file()
             if self.server:
                 self.server.shutdown()
 
+    def _get_session_id_file(self, cwd=None):
+        """Get the per-terminal session ID file path."""
+        cwd_hash = ""
+        if cwd:
+            cwd_hash = f"-{hashlib.md5(cwd.encode()).hexdigest()[:8]}"
+        return Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
+
+    def _get_electron_session_id(self, cwd=None):
+        """Get the current Electron session ID if available."""
+        session_id_file = self._get_session_id_file(cwd)
+        if session_id_file.exists():
+            try:
+                return session_id_file.read_text().strip()
+            except OSError:
+                pass
+        return None
+
+    def _notify_electron_app(self, hook_data):
+        """Send notification to Electron menubar app."""
+        url = f"http://localhost:{ELECTRON_PORT}/api/notify"
+        cwd = hook_data.get("cwd") if hook_data else None
+        payload = {"session_id": self._get_electron_session_id(cwd)}
+        if hook_data:
+            payload["message"] = hook_data.get("message", "Claude finished!")
+            payload["notification_type"] = hook_data.get("notification_type", "")
+
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=2) as response:
+                result = json.loads(response.read().decode())
+                return {"status": "success", "message": "Electron app notified", "result": result}
+        except (urllib.error.URLError, OSError) as e:
+            return {"status": "error", "message": f"Failed to notify Electron app: {e}"}
+
+    def _discover_tracker_port(self):
+        """Find the port the exercise tracker is running on."""
+        # Try port file first (fast path)
+        if PORT_FILE.exists():
+            try:
+                port = int(PORT_FILE.read_text().strip())
+                urllib.request.urlopen(f"http://localhost:{port}/status", timeout=0.5)
+                return port
+            except (ValueError, urllib.error.URLError, OSError):
+                pass
+        # Scan port range (slower fallback)
+        for port in PORT_RANGE:
+            try:
+                urllib.request.urlopen(f"http://localhost:{port}/status", timeout=0.3)
+                return port
+            except (urllib.error.URLError, OSError):
+                continue
+        return None
+
+    def _notify_exercise_tracker(self, hook_data, max_retries=3):
+        """Send notification to exercise tracker webapp that Claude is done."""
+        port = self._discover_tracker_port()
+        if not port:
+            return {"status": "skipped", "message": "Exercise tracker not running"}
+
+        url = f"http://localhost:{port}/notify"
+        payload = {}
+        if hook_data:
+            payload["message"] = hook_data.get("message", "")
+            payload["notification_type"] = hook_data.get("notification_type", "")
+
+        for attempt in range(max_retries):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'},
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=2) as response:
+                    result = json.loads(response.read().decode())
+                    return {"status": "success", "message": "Exercise tracker notified", "result": result}
+            except urllib.error.URLError as e:
+                if "Connection refused" in str(e):
+                    return {"status": "skipped", "message": "Exercise tracker not running"}
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return {"status": "error", "message": f"Notification failed after {max_retries} attempts: {e}"}
+            except Exception as e:
+                return {"status": "error", "message": f"Notification failed: {e}"}
+        return {"status": "error", "message": "Notification failed"}
+
+    def handle_notification(self, hook_data):
+        """Handle Notification hook event — notify exercise UI that Claude is done."""
+        # Set terminal tab title
+        sys.stderr.write('\033]0;vibereps: done\007')
+        sys.stderr.flush()
+
+        # First try Electron menubar app
+        if is_electron_app_running():
+            result = self._notify_electron_app(hook_data)
+            # Desktop notification only if terminal isn't focused
+            if not terminal_is_focused():
+                self._send_desktop_notification("Claude is done! Time to head back.")
+            return result
+
+        # Fall back to browser-based tracker
+        result = self._notify_exercise_tracker(hook_data)
+        if not terminal_is_focused():
+            self._send_desktop_notification("Claude is done! Time to head back.")
+        return result
+
+    def _send_desktop_notification(self, message):
+        """Send a macOS desktop notification (non-blocking)."""
+        try:
+            subprocess.Popen(
+                ["osascript", "-e", f'display notification "{message}" with title "VibeReps"'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except OSError:
+            pass  # Not on macOS or osascript unavailable
+
     def handle_hook(self, event_type, data):
         """Main hook handler"""
+        if event_type == "notification":
+            if should_debounce_notification(data):
+                return {"status": "skipped", "message": "Notification debounced (duplicate within 5s)"}
+            return self.handle_notification(data)
+
+        # For exercise-triggering events, check suppression conditions
+        if event_type in ("user_prompt_submit", "post_tool_use", "task_complete"):
+            if is_agent_session(data):
+                return {"status": "skipped", "message": "Agent/delegate session — skipping exercise"}
+            if is_session_replay(data):
+                return {"status": "skipped", "message": "Session replay suppression — skipping exercise"}
+
         if event_type == "user_prompt_submit" or event_type == "post_tool_use":
             # For user_prompt_submit, check if the prompt is likely to result in edits
             if event_type == "user_prompt_submit":
@@ -1115,6 +1487,10 @@ class ExerciseTrackerHook:
                 if not prompt_likely_to_edit(prompt):
                     return {"status": "skipped", "message": "Prompt doesn't look like it will result in edits"}
 
+            # Set terminal tab title
+            sys.stderr.write('\033]0;vibereps: exercising\007')
+            sys.stderr.flush()
+
             # First, check if Electron menubar app is running or can be launched
             electron_running = is_electron_app_running()
 
@@ -1128,7 +1504,6 @@ class ExerciseTrackerHook:
                 # Include cwd hash to differentiate multiple Claude instances in same parent
                 cwd_hash = ""
                 if data and data.get("cwd"):
-                    import hashlib
                     cwd_hash = f"-{hashlib.md5(data['cwd'].encode()).hexdigest()[:8]}"
                 session_id_file = Path(f"/tmp/vibereps-session-id-{os.getppid()}{cwd_hash}")
                 if session_id_file.exists():
@@ -1318,19 +1693,43 @@ def main():
         tracker.run_server_daemon(quick_mode=True)
         return 0
 
-    # Parse Claude Code hook event
-    if len(sys.argv) > 1:
-        event_type = sys.argv[1]
-        # Command line arg is usually '{}', real data comes from stdin
-        _ = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {}
-    else:
-        # Test mode
-        event_type = "post_tool_use"
-
-    # Read actual hook payload from stdin (Claude Code passes it there)
+    # Read hook payload from stdin FIRST (Claude Code passes data there)
     hook_data = read_hook_payload_from_stdin()
 
-    # Initialize tracker first (needed for session ID generation)
+    # Determine event type: prefer stdin hook_event_name, fall back to argv
+    event_type = None
+    if hook_data:
+        raw = hook_data.get("hook_event_name", "")
+        if raw:
+            event_name_map = {
+                "posttooluse": "post_tool_use",
+                "userpromptsubmit": "user_prompt_submit",
+                "taskcomplete": "task_complete",
+                "notification": "notification",
+                "sessionstart": "session_start",
+                "stop": "stop",
+            }
+            event_type = event_name_map.get(raw.lower(), raw.lower().replace(" ", "_"))
+
+    if not event_type and len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        event_type = sys.argv[1]
+
+    if not event_type:
+        # No event type from stdin or argv — default to post_tool_use for test mode
+        event_type = "post_tool_use"
+
+    # Record session start time (for replay suppression) and check for updates
+    if event_type == "session_start":
+        record_session_start(hook_data)
+        check_for_updates()  # Non-blocking, once per day
+        return 0
+
+    # Check pause — but NOT for notifications (user may be mid-exercise)
+    if event_type != "notification" and is_paused():
+        print('{"status": "skipped", "message": "VibeReps is paused"}')
+        return 0
+
+    # Initialize tracker
     tracker = ExerciseTrackerHook()
 
     # Build context from hook payload + transcript
@@ -1347,7 +1746,7 @@ def main():
     result = tracker.handle_hook(event_type, hook_data)
 
     print(json.dumps(result))
-    return 0 if result["status"] == "success" else 1
+    return 0 if result["status"] in ("success", "skipped") else 1
 
 
 if __name__ == "__main__":

@@ -126,7 +126,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /path/to/exercise_tracker.py post_tool_use '{}'",
+            "command": "VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches /path/to/vibereps.py",
             "async": true
           }
         ]
@@ -138,7 +138,7 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/notify_complete.py '{}'",
+            "command": "/path/to/vibereps.py",
             "async": true
           }
         ]
@@ -231,13 +231,13 @@ if (angle < 80 && exerciseState !== 'down') {  // Default: 100
 
 ```bash
 # Test quick mode with specific exercises
-VIBEREPS_EXERCISES=squats,standing_crunches ./exercise_tracker.py post_tool_use '{}'
+VIBEREPS_EXERCISES=squats,standing_crunches ./vibereps.py post_tool_use '{}'
 
 # Test notification (run in another terminal while tracker is open)
-./notify_complete.py '{}'
+echo '{"hook_event_name":"Notification"}' | ./vibereps.py
 
 # Test normal mode
-./exercise_tracker.py task_complete '{}'
+./vibereps.py task_complete '{}'
 ```
 
 ## 🚨 Troubleshooting
@@ -249,7 +249,7 @@ VIBEREPS_EXERCISES=squats,standing_crunches ./exercise_tracker.py post_tool_use 
 /hooks list
 
 # Make scripts executable
-chmod +x exercise_tracker.py notify_complete.py
+chmod +x vibereps.py notify_complete.py
 
 # Verify paths are correct (use absolute paths)
 which python3  # Use this path if needed

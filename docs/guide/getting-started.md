@@ -68,11 +68,11 @@ After installing, run `/hooks list` in Claude Code to verify the hooks are regis
 ```
 PostToolUse:
   - matcher: Write|Edit|MultiEdit
-    command: ~/.vibereps/exercise_tracker.py post_tool_use '{}'
+    command: ~/.vibereps/vibereps.py
 
 Notification:
   - matcher: (empty)
-    command: ~/.vibereps/notify_complete.py '{}'
+    command: ~/.vibereps/vibereps.py
 ```
 
 ## Testing
@@ -81,10 +81,10 @@ You can test the tracker manually:
 
 ```bash
 # Test quick mode with specific exercises
-VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/exercise_tracker.py post_tool_use '{}'
+VIBEREPS_EXERCISES=squats,jumping_jacks ~/.vibereps/vibereps.py post_tool_use '{}'
 
 # Test notification (run in another terminal while tracker is open)
-~/.vibereps/notify_complete.py '{}'
+echo '{"hook_event_name":"Notification"}' | ~/.vibereps/vibereps.py
 ```
 
 ## Claude Code Skill

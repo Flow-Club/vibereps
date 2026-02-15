@@ -85,7 +85,7 @@ VibeReps uses a two-tier port architecture:
 - **Electron app**: Fixed port 8800
 - **Webapp (browser)**: Ports 8765-8774 (dynamic allocation)
 
-The webapp automatically finds an available port in the range. To change the base port for the webapp, edit `~/.vibereps/exercise_tracker.py`:
+The webapp automatically finds an available port in the range. To change the base port for the webapp, edit `~/.vibereps/vibereps.py`:
 
 ```python
 self.port = 8765  # Base port (will try 8765-8774)

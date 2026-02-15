@@ -19,7 +19,7 @@ mkdir -p "$BUILD_DIR"
 
 # Files to include in release
 FILES=(
-    "exercise_tracker.py"
+    "vibereps.py"
     "notify_complete.py"
     "exercise_ui.html"
     "install.sh"

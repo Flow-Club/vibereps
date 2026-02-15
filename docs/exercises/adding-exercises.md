@@ -250,7 +250,7 @@ MediaPipe provides these landmarks:
    ```
 3. Test the tracker:
    ```bash
-   ./exercise_tracker.py post_tool_use '{}'
+   ./vibereps.py post_tool_use '{}'
    ```
 4. Adjust thresholds based on detection accuracy
 
