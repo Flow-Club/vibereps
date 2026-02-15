@@ -273,6 +273,18 @@ setup_permissions() {
     chmod +x "$INSTALL_DIR/vibereps.py"
     chmod +x "$INSTALL_DIR/notify_complete.py"  # Deprecated wrapper
     print_success "Scripts are executable"
+
+    # Install shell completions
+    if [[ -f "$INSTALL_DIR/completions.bash" ]]; then
+        print_step "Installing shell completions"
+        # Symlink to /usr/local/bin for PATH access
+        if [[ -d "/usr/local/bin" ]]; then
+            ln -sf "$INSTALL_DIR/vibereps.py" /usr/local/bin/vibereps 2>/dev/null && \
+                print_success "Symlinked 'vibereps' command to /usr/local/bin"
+        fi
+        # Source completions hint
+        print_success "Shell completions available: source $INSTALL_DIR/completions.bash"
+    fi
 }
 
 # Backup existing settings
@@ -315,6 +327,19 @@ else:
 if "hooks" not in settings:
     settings["hooks"] = {}
 
+# Check if guard.sh exists (hook toggle system)
+guard_sh = Path(os.path.expanduser("~/.claude/hooks/guard.sh"))
+has_guard = guard_sh.exists()
+
+def cmd(hook_name, inner_cmd):
+    """Wrap command with guard.sh if available for hook toggling support."""
+    if has_guard:
+        return f"{guard_sh} {hook_name} {inner_cmd}"
+    return inner_cmd
+
+exercise_cmd = cmd("vibereps", f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/vibereps.py")
+notify_cmd = cmd("vibereps", f"{install_dir}/vibereps.py")
+
 # Define the vibereps hooks
 vibereps_hooks = {
     "PostToolUse": [
@@ -323,7 +348,7 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/vibereps.py",
+                    "command": exercise_cmd,
                     "async": True
                 }
             ]
@@ -335,7 +360,7 @@ vibereps_hooks = {
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"{install_dir}/vibereps.py",
+                    "command": notify_cmd,
                     "async": True
                 }
             ]
@@ -351,7 +376,7 @@ if trigger_mode == "prompt":
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"VIBEREPS_EXERCISES=squats,jumping_jacks,standing_crunches,calf_raises,side_stretches {install_dir}/vibereps.py",
+                    "command": exercise_cmd,
                     "async": True
                 }
             ]
