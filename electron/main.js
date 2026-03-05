@@ -398,15 +398,17 @@ function setupHttpServer() {
     }
 
     // Show desktop notification
+    let notificationShown = false;
     if (Notification.isSupported()) {
       new Notification({
         title: 'Claude Finished',
         body: message || 'Claude has completed the task'
       }).show();
+      notificationShown = true;
     }
 
     updateTrayTooltip();
-    res.json({ success: true });
+    res.json({ success: true, notification_shown: notificationShown });
   });
 
   // API: Exercise completed
@@ -481,7 +483,7 @@ function setupHttpServer() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('claude-complete', req.body);
     }
-    res.json({ success: true });
+    res.json({ success: true, notification_shown: false });
   });
 
   expressApp.get('/context', (req, res) => {
