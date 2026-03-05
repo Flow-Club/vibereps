@@ -1353,6 +1353,21 @@ class ExerciseTrackerHook:
                 return session_id_file.read_text().strip()
             except OSError:
                 pass
+
+        # Fallback: try PPID-only match (no cwd hash)
+        # Handles cases where Notification hook has a different cwd than PostToolUse
+        ppid = os.getppid()
+        matches = sorted(
+            Path("/tmp").glob(f"vibereps-session-id-{ppid}*"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        if matches:
+            try:
+                return matches[0].read_text().strip()
+            except OSError:
+                pass
+
         return None
 
     def _notify_electron_app(self, hook_data):
@@ -1439,7 +1454,17 @@ class ExerciseTrackerHook:
         # First try Electron menubar app
         if is_electron_app_running():
             result = self._notify_electron_app(hook_data)
-            # Desktop notification only if terminal isn't focused
+            # Check if Electron actually showed a notification
+            notification_shown = False
+            if result.get("status") == "success":
+                electron_result = result.get("result", {})
+                notification_shown = electron_result.get("notification_shown", False)
+
+            if not notification_shown:
+                # Electron didn't show notification — also try browser tracker
+                self._notify_exercise_tracker(hook_data)
+
+            # Desktop notification if terminal isn't focused (regardless of Electron)
             if not terminal_is_focused():
                 self._send_desktop_notification("Claude is done! Time to head back.")
             return result
@@ -1665,7 +1690,8 @@ def read_hook_payload_from_stdin() -> dict:
     import select
 
     # Check if there's data on stdin (non-blocking)
-    if select.select([sys.stdin], [], [], 0.1)[0]:
+    # Use 0.5s timeout to avoid missing payloads under load
+    if select.select([sys.stdin], [], [], 0.5)[0]:
         try:
             return json.load(sys.stdin)
         except (json.JSONDecodeError, ValueError):
