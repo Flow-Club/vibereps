@@ -194,6 +194,10 @@ except ImportError:
             elif "paused_until" in config:
                 del config["paused_until"]
             config_path.write_text(json.dumps(config, indent=2))
+            try:
+                config_path.chmod(0o600)
+            except OSError:
+                pass
             return True
         except OSError:
             return False
@@ -272,8 +276,14 @@ if _HAS_CONFIG_MODULE:
     VIBEREPS_API_URL = _remote["api_url"]
     VIBEREPS_API_KEY = _remote["api_key"]
 else:
-    VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")
-    VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")
+    _cfg_path = Path.home() / ".vibereps" / "config.json"
+    try:
+        _cfg_data = json.loads(_cfg_path.read_text()) if _cfg_path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        _cfg_data = {}
+    _remote = _cfg_data.get("remote_sync", {})
+    VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", _remote.get("api_url", ""))
+    VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", _remote.get("api_key", ""))
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 

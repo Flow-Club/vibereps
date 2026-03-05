@@ -61,7 +61,7 @@ def is_paused() -> bool:
         if pause_time.tzinfo:
             now = datetime.now(pause_time.tzinfo)
         return now < pause_time
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         return False
 
 
