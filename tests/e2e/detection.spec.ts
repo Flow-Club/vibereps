@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/electron-app';
 import { injectMediaPipeMock, setPoseFrames, triggerPoseFrame, getRepCount } from '../mocks/mediapipe-mock';
 import { SQUAT_3_REPS, SQUAT_SHALLOW, JUMPING_JACK_3_REPS } from '../fixtures/poses';
 
@@ -10,15 +10,13 @@ import { SQUAT_3_REPS, SQUAT_SHALLOW, JUMPING_JACK_3_REPS } from '../fixtures/po
  * For now they're structured for the Electron app which serves the UI.
  */
 
-const ELECTRON_URL = 'http://localhost:8800';
-
 test.describe('Exercise Detection', () => {
   test.beforeEach(async ({ page }) => {
     await injectMediaPipeMock(page);
   });
 
-  test('squats: 3 reps detected correctly', async ({ page }) => {
-    await page.goto(`${ELECTRON_URL}/?exercise=squats&quick=true`);
+  test('squats: 3 reps detected correctly', async ({ electronProcess, electronBaseUrl, page }) => {
+    await page.goto(`${electronBaseUrl}/?exercises=squats&quick=true`);
     await page.waitForSelector('#counter');
 
     // Feed mock pose frames
@@ -31,8 +29,8 @@ test.describe('Exercise Detection', () => {
     expect(reps).toBe(SQUAT_3_REPS.expectedReps);
   });
 
-  test('squats: shallow movement does not count', async ({ page }) => {
-    await page.goto(`${ELECTRON_URL}/?exercise=squats&quick=true`);
+  test('squats: shallow movement does not count', async ({ electronProcess, electronBaseUrl, page }) => {
+    await page.goto(`${electronBaseUrl}/?exercises=squats&quick=true`);
     await page.waitForSelector('#counter');
 
     for (const frame of SQUAT_SHALLOW.frames) {
@@ -44,8 +42,8 @@ test.describe('Exercise Detection', () => {
     expect(reps).toBe(SQUAT_SHALLOW.expectedReps);
   });
 
-  test('jumping jacks: 3 reps detected correctly', async ({ page }) => {
-    await page.goto(`${ELECTRON_URL}/?exercise=jumping_jacks&quick=true`);
+  test('jumping jacks: 3 reps detected correctly', async ({ electronProcess, electronBaseUrl, page }) => {
+    await page.goto(`${electronBaseUrl}/?exercises=jumping_jacks&quick=true`);
     await page.waitForSelector('#counter');
 
     for (const frame of JUMPING_JACK_3_REPS.frames) {

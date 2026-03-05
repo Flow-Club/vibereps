@@ -87,12 +87,12 @@ const STANDING = createFullPose();
 
 // Deep squat: knees bent to ~90 degrees
 const SQUAT_DOWN = createFullPose({
-  23: { x: 0.45, y: 0.55, z: 0, visibility: 0.99 }, // hips drop
-  24: { x: 0.55, y: 0.55, z: 0, visibility: 0.99 },
-  25: { x: 0.42, y: 0.68, z: 0.15, visibility: 0.99 }, // knees forward
-  26: { x: 0.58, y: 0.68, z: 0.15, visibility: 0.99 },
-  27: { x: 0.43, y: 0.9, z: 0, visibility: 0.99 },
-  28: { x: 0.57, y: 0.9, z: 0, visibility: 0.99 },
+  23: { x: 0.45, y: 0.50, z: 0, visibility: 0.99 }, // left hip drops
+  24: { x: 0.55, y: 0.50, z: 0, visibility: 0.99 }, // right hip drops
+  25: { x: 0.35, y: 0.65, z: 0, visibility: 0.99 }, // left knee forward and out
+  26: { x: 0.65, y: 0.65, z: 0, visibility: 0.99 }, // right knee forward and out
+  27: { x: 0.45, y: 0.80, z: 0, visibility: 0.99 }, // left ankle below knee
+  28: { x: 0.55, y: 0.80, z: 0, visibility: 0.99 }, // right ankle below knee
 });
 
 // Shallow squat (shouldn't count)

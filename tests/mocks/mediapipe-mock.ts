@@ -94,7 +94,13 @@ export const MEDIAPIPE_MOCK_SCRIPT = `
  * Inject the MediaPipe mock into a page before navigation.
  */
 export async function injectMediaPipeMock(page: Page): Promise<void> {
-  await page.addInitScript(MEDIAPIPE_MOCK_SCRIPT);
+  // Block real MediaPipe CDN scripts so mock isn't overwritten
+  await page.route('**/@mediapipe/**', route => route.abort());
+  await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+  await page.addInitScript(MEDIAPIPE_MOCK_SCRIPT + `
+    // Resolve mediapipeReady immediately since mock is ready
+    window.mediapipeReady = Promise.resolve();
+  `);
 }
 
 /**

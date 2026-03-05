@@ -62,7 +62,7 @@ export const test = base.extend<ElectronFixtures>({
     });
   },
 
-  electronBaseUrl: async ({}, use) => {
+  electronBaseUrl: async ({ electronProcess }, use) => {
     await use(`http://localhost:${ELECTRON_PORT}`);
   },
 });

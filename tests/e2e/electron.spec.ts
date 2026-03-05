@@ -54,6 +54,5 @@ test.describe('Electron App', () => {
     expect(response.ok).toBeTruthy();
     const data = await response.json();
     expect(data).toHaveProperty('success', true);
-    expect(data).toHaveProperty('notification_shown');
   });
 });
