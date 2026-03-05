@@ -141,54 +141,73 @@ if os.getenv("VIBEREPS_DISABLED", ""):
     sys.exit(0)
 
 
-def is_paused() -> bool:
-    """Check if vibereps is paused (paused_until timestamp in config)."""
-    from datetime import datetime
-    config_path = Path.home() / ".vibereps" / "config.json"
-    try:
-        if config_path.exists():
-            config = json.loads(config_path.read_text())
-            paused_until = config.get("paused_until")
-            if paused_until:
-                pause_time = datetime.fromisoformat(paused_until.replace("Z", "+00:00"))
-                # Handle timezone-naive comparison
-                now = datetime.now()
-                if pause_time.tzinfo:
-                    now = datetime.now(pause_time.tzinfo)
-                else:
-                    # Assume local time if no timezone
-                    pass
-                if now < pause_time:
-                    return True
-    except (json.JSONDecodeError, ValueError, OSError):
-        pass
-    return False
+try:
+    from vibereps_config import (
+        is_paused, set_pause as _cfg_set_pause, clear_pause as _cfg_clear_pause,
+        get_paused_until, get_remote_settings as _cfg_get_remote,
+    )
+    _HAS_CONFIG_MODULE = True
 
-
-def set_pause(until_timestamp=None) -> bool:
-    """Set or clear the pause state. If until_timestamp is None, clears pause."""
-    from datetime import datetime
-    config_path = Path.home() / ".vibereps" / "config.json"
-    config_dir = config_path.parent
-
-    try:
-        config_dir.mkdir(exist_ok=True)
-        config = {}
-        if config_path.exists():
-            try:
-                config = json.loads(config_path.read_text())
-            except json.JSONDecodeError:
-                pass
-
+    def set_pause(until_timestamp=None) -> bool:
+        """Set or clear the pause state."""
         if until_timestamp:
-            config["paused_until"] = until_timestamp
-        elif "paused_until" in config:
-            del config["paused_until"]
+            return _cfg_set_pause(until_timestamp)
+        else:
+            return _cfg_clear_pause()
 
-        config_path.write_text(json.dumps(config, indent=2))
-        return True
-    except OSError:
+except ImportError:
+    _HAS_CONFIG_MODULE = False
+
+    def is_paused() -> bool:
+        """Check if vibereps is paused (paused_until timestamp in config)."""
+        from datetime import datetime
+        config_path = Path.home() / ".vibereps" / "config.json"
+        try:
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+                paused_until = config.get("paused_until")
+                if paused_until:
+                    pause_time = datetime.fromisoformat(paused_until.replace("Z", "+00:00"))
+                    now = datetime.now()
+                    if pause_time.tzinfo:
+                        now = datetime.now(pause_time.tzinfo)
+                    if now < pause_time:
+                        return True
+        except (json.JSONDecodeError, ValueError, OSError):
+            pass
         return False
+
+    def set_pause(until_timestamp=None) -> bool:
+        """Set or clear the pause state."""
+        config_path = Path.home() / ".vibereps" / "config.json"
+        config_dir = config_path.parent
+        try:
+            config_dir.mkdir(exist_ok=True)
+            config = {}
+            if config_path.exists():
+                try:
+                    config = json.loads(config_path.read_text())
+                except json.JSONDecodeError:
+                    pass
+            if until_timestamp:
+                config["paused_until"] = until_timestamp
+            elif "paused_until" in config:
+                del config["paused_until"]
+            config_path.write_text(json.dumps(config, indent=2))
+            return True
+        except OSError:
+            return False
+
+    def get_paused_until() -> str | None:
+        """Get the paused_until timestamp string."""
+        config_path = Path.home() / ".vibereps" / "config.json"
+        try:
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+                return config.get("paused_until")
+        except (json.JSONDecodeError, OSError):
+            pass
+        return None
 
 
 def get_end_of_day() -> str:
@@ -234,17 +253,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
     sys.exit(0)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--status":
-    from datetime import datetime
-    config_path = Path.home() / ".vibereps" / "config.json"
     paused = is_paused()
-    paused_until = None
-    try:
-        if config_path.exists():
-            config = json.loads(config_path.read_text())
-            paused_until = config.get("paused_until")
-    except (json.JSONDecodeError, OSError):
-        pass
     if paused:
+        paused_until = get_paused_until()
         msg = "vibereps: paused"
         if paused_until:
             msg += f" until {paused_until}"
@@ -255,9 +266,14 @@ if len(sys.argv) > 1 and sys.argv[1] == "--status":
 
 # Note: pause check moved into main() so notifications aren't blocked while exercising
 
-# Configuration - set these environment variables or edit directly
-VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")  # e.g., "https://vibereps.example.com"
-VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")  # Your API key
+# Configuration - env vars or ~/.vibereps/config.json (env vars take precedence)
+if _HAS_CONFIG_MODULE:
+    _remote = _cfg_get_remote()
+    VIBEREPS_API_URL = _remote["api_url"]
+    VIBEREPS_API_KEY = _remote["api_key"]
+else:
+    VIBEREPS_API_URL = os.getenv("VIBEREPS_API_URL", "")
+    VIBEREPS_API_KEY = os.getenv("VIBEREPS_API_KEY", "")
 VIBEREPS_EXERCISES = os.getenv("VIBEREPS_EXERCISES", "")  # Comma-separated: "squats,pushups,jumping_jacks"
 VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY = os.getenv("VIBEREPS_DANGEROUSLY_SKIP_LEG_DAY", "")  # Set to 1 to --dangerously-skip-leg-day
 
