@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "name": "vibereps-tests",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "typescript": "^5.7.0"
+  }
+}

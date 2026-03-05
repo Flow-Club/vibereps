@@ -88,5 +88,9 @@ dist/
 # Electron build artifacts
 electron/out/
 
+# Test artifacts
+tests/playwright-report/
+tests/test-results/
+
 # MediaPipe models (downloaded via npm run download-mediapipe)
 electron/assets/mediapipe/

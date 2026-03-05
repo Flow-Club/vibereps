@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "name": "vibereps",
+  "description": "Exercise tracker for Claude Code",
+  "scripts": {
+    "test": "cd tests && npx playwright test",
+    "start": "cd electron && npm start",
+    "build": "cd electron && npm run build",
+    "install:all": "cd electron && npm install && cd ../tests && npm install"
+  }
+}
