@@ -483,11 +483,7 @@ function setupHttpServer() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('claude-complete', req.body);
     }
-    let notificationShown = false;
-    if (Notification.isSupported()) {
-      notificationShown = true;
-    }
-    res.json({ success: true, notification_shown: notificationShown });
+    res.json({ success: true, notification_shown: false });
   });
 
   expressApp.get('/context', (req, res) => {

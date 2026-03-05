@@ -1357,9 +1357,16 @@ class ExerciseTrackerHook:
         # Fallback: try PPID-only match (no cwd hash)
         # Handles cases where Notification hook has a different cwd than PostToolUse
         ppid = os.getppid()
+
+        def _safe_mtime(p):
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                return 0.0
+
         matches = sorted(
-            Path("/tmp").glob(f"vibereps-session-id-{ppid}*"),
-            key=lambda p: p.stat().st_mtime,
+            Path("/tmp").glob(f"vibereps-session-id-{ppid}-*"),
+            key=_safe_mtime,
             reverse=True
         )
         if matches:
@@ -1691,6 +1698,8 @@ def read_hook_payload_from_stdin() -> dict:
 
     # Check if there's data on stdin (non-blocking)
     # Use 0.5s timeout to avoid missing payloads under load
+    if sys.stdin.isatty():
+        return {}
     if select.select([sys.stdin], [], [], 0.5)[0]:
         try:
             return json.load(sys.stdin)
