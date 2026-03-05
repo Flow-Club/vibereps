@@ -1,0 +1,81 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '*.md']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', '*.md']
+
+jobs:
+  playwright-tests:
+    name: Playwright Tests
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: |
+          npm install
+          npx playwright install
+
+      - name: Run Playwright tests
+        working-directory: tests
+        run: npx playwright test
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/playwright-report/
+          retention-days: 14
+
+  python-check:
+    name: Python Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax check
+        run: python3 -m py_compile vibereps.py
+
+      - name: CLI smoke test
+        run: |
+          python3 vibereps.py --help
+          python3 vibereps.py --list-exercises
+
+  electron-build:
+    name: Electron Build
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build app
+        working-directory: electron
+        run: npm run build
